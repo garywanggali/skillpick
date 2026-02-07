@@ -198,23 +198,21 @@ def get_ai_video_recommendation(topic):
     candidates.extend(bili_candidates)
     
     # 尝试 DDG (作为补充或兜底)
-    # 如果 B站返回少于 3 个，或者作为多样性补充，都调用 DDG
     if len(candidates) < 5:
         ddg_candidates = search_candidates_from_ddg(keywords, limit=5)
         candidates.extend(ddg_candidates)
     
+    # 4. Blind LLM Fallback (如果搜不到视频，让 LLM 直接生成建议)
     if not candidates:
-        print("No candidates found from any source.")
-        return None
+        print("No candidates found. Using Blind LLM Fallback.")
+        return call_llm_for_blind_suggestion(topic, last_log)
 
-    # 4. 使用 LLM 选择最佳视频
+    # 5. 使用 LLM 选择最佳视频
     selection = call_llm_to_select(topic, last_log, candidates)
     
-    # 5. 降级策略
+    # 6. 降级策略
     if not selection:
         print("LLM selection failed, falling back to rule-based.")
-        # 简单规则：优先 Bilibili，然后按播放量
-        # 归一化播放量逻辑略复杂，这里简单按列表顺序（通常搜索引擎已经排好序了）
         selection = candidates[0]
         selection['reason'] = "根据热度为您推荐，该视频在全网搜索中排名靠前。"
 
@@ -223,3 +221,53 @@ def get_ai_video_recommendation(topic):
         'url': selection['url'],
         'reason': selection['reason']
     }
+
+def call_llm_for_blind_suggestion(topic, last_log):
+    """
+    当无法搜索到视频时，让 LLM 生成纯文本建议和搜索词
+    """
+    api_key = getattr(settings, 'OPENAI_API_KEY', None) or os.environ.get('OPENAI_API_KEY')
+    api_base = getattr(settings, 'OPENAI_API_BASE', 'https://api.openai.com/v1')
+    model = getattr(settings, 'OPENAI_MODEL', 'gpt-3.5-turbo')
+    
+    if not api_key:
+        return None
+        
+    user_context = f"Topic: {topic.title}, Level: {topic.get_current_level_display()}, Last Feedback: {last_log.feedback if last_log else 'None'}"
+    
+    prompt = f"""
+    You are a tutor. The user wants to learn: {user_context}.
+    We cannot find specific videos right now.
+    
+    Please provide:
+    1. A short study advice (Chinese).
+    2. A precise search query they can use on Bilibili.
+    
+    Return JSON:
+    {{
+        "advice": "...",
+        "search_query": "..."
+    }}
+    """
+    
+    try:
+        response = requests.post(
+            f"{api_base}/chat/completions",
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            json={"model": model, "messages": [{"role": "user", "content": prompt}], "temperature": 0.5},
+            timeout=15
+        )
+        if response.status_code == 200:
+            res = response.json()['choices'][0]['message']['content']
+            res = res.replace('```json', '').replace('```', '').strip()
+            data = json.loads(res)
+            
+            return {
+                'title': f"建议搜索：{data.get('search_query')}",
+                'url': f"https://search.bilibili.com/all?keyword={data.get('search_query')}",
+                'reason': f"暂时无法自动获取视频链接。AI 建议：{data.get('advice')}"
+            }
+    except Exception as e:
+        print(f"Blind LLM failed: {e}")
+        
+    return None
