@@ -69,3 +69,17 @@ class TopicRecommendationCache(models.Model):
 
     def __str__(self):
         return f"Cache: {self.topic_keyword} ({self.level})"
+
+class DailyPopupRecord(models.Model):
+    """
+    记录用户每日弹窗状态
+    """
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    date = models.DateField(auto_now_add=True)
+    action = models.CharField(max_length=20, choices=[('accepted', '接受'), ('rejected', '拒绝')])
+    
+    class Meta:
+        unique_together = ['user', 'date']
+    
+    def __str__(self):
+        return f"{self.user.username} - {self.date} - {self.action}"

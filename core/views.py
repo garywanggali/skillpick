@@ -5,7 +5,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.urls import reverse_lazy
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import login
-from .models import Topic, LearningLog, DailyRecommendation
+from .models import Topic, LearningLog, DailyRecommendation, DailyPopupRecord
 import random
 from django import forms
 from django.utils import timezone
@@ -81,6 +81,68 @@ class DashboardView(LoginRequiredMixin, ListView):
                 context['need_generation'] = True
             
         return context
+
+@login_required
+def check_daily_popup(request):
+    """
+    检查是否需要显示每日弹窗
+    """
+    today = date.today()
+    
+    # 1. 检查今天是否已经做出过选择
+    if DailyPopupRecord.objects.filter(user=request.user, date=today).exists():
+        return JsonResponse({'show': False})
+        
+    # 2. 获取今日推荐（如果还没生成，这里尝试获取，如果没有则不弹，或者在前端触发生成）
+    # 为了简化，如果还没生成推荐，我们先不弹窗，等用户进入Dashboard生成后再说？
+    # 不，需求是“只要打开设备”，所以我们应该在这里尝试获取或生成。
+    # 复用 generate_recommendation_api 的逻辑，但这里是 GET 请求
+    
+    recommendation = DailyRecommendation.objects.filter(user=request.user, date=today).first()
+    
+    if not recommendation:
+        # 尝试生成
+        topics = Topic.objects.filter(user=request.user, is_archived=False)
+        if topics.exists():
+            selected_topic = random.choice(list(topics))
+            # 注意：get_ai_video_recommendation 是同步耗时的。
+            # 如果不想阻塞，可以返回 {'show': False, 'trigger_generation': True} 让前端去调生成接口
+            # 但为了简单实现弹窗内容，我们这里先同步调用（假设缓存命中率高，或者用户愿意等几秒）
+            ai_rec = get_ai_video_recommendation(selected_topic)
+            try:
+                recommendation = DailyRecommendation.objects.create(
+                    user=request.user,
+                    topic=selected_topic,
+                    date=today,
+                    recommended_video_title=ai_rec['title'] if ai_rec else None,
+                    recommended_video_url=ai_rec['url'] if ai_rec else None,
+                    recommended_reason=ai_rec['reason'] if ai_rec else None
+                )
+            except IntegrityError:
+                recommendation = DailyRecommendation.objects.filter(user=request.user, date=today).first()
+    
+    if recommendation:
+        return JsonResponse({
+            'show': True,
+            'topic': recommendation.topic.title,
+            'video_title': recommendation.recommended_video_title or "查看详情",
+            'reason': recommendation.recommended_reason or "为您精选的学习内容",
+            'url': reverse_lazy('daily_pick') # 跳转到每日推荐页
+        })
+    
+    return JsonResponse({'show': False})
+
+@login_required
+@require_POST
+def record_popup_action(request):
+    """
+    记录弹窗操作
+    """
+    action = request.POST.get('action')
+    if action in ['accepted', 'rejected']:
+        DailyPopupRecord.objects.create(user=request.user, action=action)
+        return JsonResponse({'status': 'ok'})
+    return JsonResponse({'status': 'error'}, status=400)
 
 @login_required
 @require_POST

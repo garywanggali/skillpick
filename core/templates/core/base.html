@@ -217,5 +217,62 @@
     <footer>
         <p>&copy; {% now "Y" %} SKILLPICK | 拾趣. LESS IS MORE.</p>
     </footer>
+
+    <!-- Daily Popup Modal -->
+    <div id="daily-popup" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 9999; align-items: center; justify-content: center;">
+        <div style="background: #111; border: 1px solid #333; padding: 30px; width: 90%; max-width: 400px; text-align: center; position: relative;">
+            <h3 style="color: #fff; margin-top: 0; font-weight: 300;">今日学习提醒</h3>
+            <div id="popup-content">
+                <i class="fa-solid fa-spinner fa-spin" style="font-size: 2em; color: #666; margin: 20px 0;"></i>
+                <p style="color: #888;">正在为您抽取今日内容...</p>
+            </div>
+        </div>
+    </div>
+
+    {% if user.is_authenticated %}
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Check Daily Popup
+            fetch("{% url 'api_check_popup' %}")
+            .then(response => response.json())
+            .then(data => {
+                if (data.show) {
+                    const popup = document.getElementById('daily-popup');
+                    const content = document.getElementById('popup-content');
+                    
+                    // Show modal
+                    popup.style.display = 'flex';
+                    
+                    // Update content
+                    content.innerHTML = `
+                        <h2 style="color: #fff; margin: 15px 0;">${data.topic}</h2>
+                        <p style="color: #aaa; font-size: 0.9em; margin-bottom: 25px;">${data.reason}</p>
+                        <div style="display: flex; gap: 10px; justify-content: center;">
+                            <button onclick="handlePopup('rejected')" class="btn btn-outline" style="border-color: #444; color: #666;">滚，今天算了</button>
+                            <button onclick="handlePopup('accepted', '${data.url}')" class="btn btn-success">行吧，去看看</button>
+                        </div>
+                    `;
+                }
+            });
+        });
+
+        function handlePopup(action, url) {
+            fetch("{% url 'api_record_popup' %}", {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': '{{ csrf_token }}',
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `action=${action}`
+            })
+            .then(() => {
+                document.getElementById('daily-popup').style.display = 'none';
+                if (action === 'accepted' && url) {
+                    window.location.href = url;
+                }
+            });
+        }
+    </script>
+    {% endif %}
 </body>
 </html>
