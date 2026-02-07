@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>SkillPick | 拾趣</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; color: #333; line-height: 1.6; }
+        nav { margin-bottom: 30px; padding: 15px 0; border-bottom: 1px solid #eee; display: flex; align-items: center; justify-content: space-between; }
+        .nav-links a { margin-right: 20px; text-decoration: none; color: #555; font-weight: 500; }
+        .nav-links a:hover { color: #007bff; }
+        .logo { font-size: 1.5rem; font-weight: bold; color: #007bff; text-decoration: none; margin-right: auto; }
+        
+        .btn { display: inline-block; padding: 8px 16px; background: #007bff; color: white; text-decoration: none; border-radius: 4px; border: none; cursor: pointer; font-size: 0.95rem; transition: background 0.2s; }
+        .btn:hover { background: #0056b3; }
+        .btn-sm { padding: 4px 10px; font-size: 0.85rem; }
+        .btn-outline { background: transparent; border: 1px solid #ddd; color: #666; }
+        .btn-outline:hover { background: #f8f9fa; color: #333; }
+        
+        .card { border: 1px solid #e9ecef; padding: 20px; margin-bottom: 20px; border-radius: 8px; background: white; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
+        
+        form p { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: 600; color: #444; }
+        input[type="text"], input[type="password"], textarea, select, input[type="number"] { width: 100%; padding: 10px; box-sizing: border-box; margin-bottom: 5px; border: 1px solid #ddd; border-radius: 4px; font-size: 1rem; }
+        input:focus, textarea:focus { border-color: #80bdff; outline: none; box-shadow: 0 0 0 0.2rem rgba(0,123,255,.25); }
+        
+        .helptext { font-size: 0.85em; color: #888; display: block; margin-bottom: 10px; margin-top: 2px; }
+        ul.errorlist { color: #dc3545; list-style: none; padding: 0; margin-bottom: 15px; }
+    </style>
+</head>
+<body>
+    <nav>
+        <a href="{% url 'dashboard' %}" class="logo">SkillPick <span style="font-weight: normal; color: #666; font-size: 0.8em;">| 拾趣</span></a>
+        <div class="nav-links">
+            <a href="{% url 'dashboard' %}">看板</a>
+            {% if user.is_authenticated %}
+                <a href="{% url 'daily_pick' %}"><i class="fa-solid fa-calendar-day"></i> 今日学习</a>
+                <a href="{% url 'topic_add' %}"><i class="fa-solid fa-plus"></i> 添加主题</a>
+                <a href="{% url 'refresh_rec' %}" style="color: #28a745; font-size: 0.9em;"><i class="fa-solid fa-rotate"></i> 刷新推荐</a>
+                <form action="{% url 'logout' %}" method="post" style="display:inline;">
+                    {% csrf_token %}
+                    <button type="submit" style="border:none; background:none; cursor:pointer; color:#666; font-size: 0.95rem; padding: 0; margin-left: 10px;">退出</button>
+                </form>
+            {% else %}
+                <a href="{% url 'login' %}">登录</a>
+                <a href="{% url 'register' %}">注册</a>
+            {% endif %}
+        </div>
+    </nav>
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+</body>
+</html>

@@ -1,0 +1,62 @@
+{% extends 'core/base.html' %}
+
+{% block content %}
+<h2>我的学习列表</h2>
+
+{% if topics %}
+    {% if daily_topic %}
+    <div style="background-color: #e8f5e9; border: 2px solid #4caf50; padding: 20px; border-radius: 8px; margin-bottom: 30px; text-align: center;">
+        <h3 style="margin-top: 0; color: #2e7d32;"><i class="fa-solid fa-star"></i> 今日推荐</h3>
+        <p style="font-size: 1.5em; font-weight: bold; margin: 15px 0;">{{ daily_topic.title }}</p>
+        <p style="color: #555;">当前等级: {{ daily_topic.get_current_level_display }}</p>
+        
+        {% if last_log %}
+        <div style="background: white; padding: 10px; margin: 15px auto; max-width: 80%; border-radius: 4px; text-align: left; border-left: 4px solid #aaa;">
+            <p style="margin: 0; font-size: 0.9em; color: #666;"><strong><i class="fa-solid fa-calendar-check"></i> 上次学习 ({{ last_log.date }}):</strong></p>
+            <p style="margin: 5px 0 0 0;">{{ last_log.feedback|default:"(无详细心得)" }}</p>
+        </div>
+        {% else %}
+        <p style="color: #888; font-size: 0.9em;">(该主题尚未开始学习)</p>
+        {% endif %}
+
+        <div style="margin-top: 20px;">
+            {% if recommendation.recommended_video_url %}
+            <a href="{{ recommendation.recommended_video_url }}" target="_blank" class="btn" style="background-color: #ff0000; margin-right: 10px;">
+                <i class="fa-solid fa-play-circle"></i> 今日推荐视频
+            </a>
+            {% else %}
+            <a href="{{ video_url }}" target="_blank" class="btn" style="background-color: #ff0000; margin-right: 10px;">
+                <i class="fa-solid fa-play-circle"></i> 查看 Bilibili 搜索结果
+            </a>
+            {% endif %}
+            <a href="{% url 'daily_pick' %}" class="btn" style="background-color: #2e7d32;">
+                <i class="fa-solid fa-pen-to-square"></i> 记录学习进度
+            </a>
+        </div>
+    </div>
+    {% endif %}
+    
+    {% for topic in topics %}
+        <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                <div>
+                    <h3 style="margin: 0; display: inline-block; vertical-align: middle;">{{ topic.title }}</h3>
+                    <span style="background: #eee; padding: 2px 8px; border-radius: 10px; font-size: 0.8em; margin-left: 10px; vertical-align: middle;">{{ topic.get_current_level_display }}</span>
+                </div>
+                <a href="{% url 'topic_edit' topic.id %}" class="btn btn-sm btn-outline" style="margin-left: 15px;"><i class="fa-solid fa-pen"></i> 编辑</a>
+            </div>
+            {% if topic.description %}
+                <p style="margin: 10px 0; color: #555;">{{ topic.description }}</p>
+            {% endif %}
+            <p style="font-size: 0.8em; color: #888; margin-top: 10px;">
+                上次学习: {{ topic.last_studied|default:"从未开始" }}
+            </p>
+        </div>
+    {% endfor %}
+{% else %}
+    <div style="text-align: center; margin-top: 50px;">
+        <p>你还没有添加任何想学的内容。</p>
+        <a href="{% url 'topic_add' %}" class="btn">添加第一个主题</a>
+    </div>
+{% endif %}
+{% endblock %}

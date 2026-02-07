@@ -1,0 +1,13 @@
+{% extends 'core/base.html' %}
+
+{% block content %}
+<div style="max-width: 400px; margin: 0 auto;">
+    <h2>注册账号</h2>
+    <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit" class="btn" style="width: 100%;">注册</button>
+    </form>
+    <p style="margin-top: 15px; text-align: center;">已经有账号了? <a href="{% url 'login' %}">直接登录</a>.</p>
+</div>
+{% endblock %}
