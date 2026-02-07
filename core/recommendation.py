@@ -8,12 +8,40 @@ from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
-def search_bilibili_candidates(keywords, limit=10):
+def search_candidates_from_ddg(keywords, limit=5):
+    """
+    使用 DuckDuckGo 搜索视频（包含 YouTube, Bilibili 等）
+    """
+    candidates = []
+    try:
+        print(f"Searching DDG for: {keywords}")
+        # region="cn-zh" 优先中文结果，safesearch="off" 避免过度过滤
+        results = DDGS().videos(keywords=keywords, region="cn-zh", safesearch="off", max_results=limit)
+        
+        if results:
+            for r in results:
+                candidates.append({
+                    'title': r.get('title', 'No Title'),
+                    'description': r.get('description', '')[:150],
+                    'duration': r.get('duration', 'N/A'),
+                    'play': r.get('views', 0), # DDG 返回的是 views
+                    'author': r.get('publisher', 'Unknown'),
+                    'url': r.get('content', '#'),
+                    'provider': 'DuckDuckGo'
+                })
+    except Exception as e:
+        print(f"DDG Search failed: {e}")
+        logger.error(f"DDG Search failed: {e}")
+        
+    return candidates
+
+def search_bilibili_candidates(keywords, limit=5):
     """
     使用 Bilibili API 搜索视频，返回候选列表
     """
     candidates = []
     try:
+        print(f"Searching Bilibili API for: {keywords}")
         url = "http://api.bilibili.com/x/web-interface/search/type"
         params = {
             'search_type': 'video',
@@ -26,30 +54,28 @@ def search_bilibili_candidates(keywords, limit=10):
         }
         
         response = requests.get(url, params=params, headers=headers, timeout=5)
-        response.raise_for_status()
-        data = response.json()
+        # response.raise_for_status() # B站有时返回412，不抛出异常以便继续尝试其他源
         
-        if data['code'] == 0 and 'data' in data and 'result' in data['data']:
-            videos = data['data']['result']
-            for v in videos[:limit]:
-                title = v.get('title', '').replace('<em class="keyword">', '').replace('</em>', '')
-                description = v.get('description', '')[:150] # 截取部分简介
-                duration = v.get('duration', '')
-                play = v.get('play', 0)
-                author = v.get('author', '')
-                bvid = v.get('bvid')
-                
-                if bvid:
-                    candidates.append({
-                        'title': title,
-                        'description': description,
-                        'duration': duration,
-                        'play': play,
-                        'author': author,
-                        'url': f"https://www.bilibili.com/video/{bvid}",
-                        'bvid': bvid,
-                        'provider': 'Bilibili'
-                    })
+        if response.status_code == 200:
+            data = response.json()
+            if data['code'] == 0 and 'data' in data and 'result' in data['data']:
+                videos = data['data']['result']
+                for v in videos[:limit]:
+                    title = v.get('title', '').replace('<em class="keyword">', '').replace('</em>', '')
+                    bvid = v.get('bvid')
+                    if bvid:
+                        candidates.append({
+                            'title': title,
+                            'description': v.get('description', '')[:150],
+                            'duration': v.get('duration', ''),
+                            'play': v.get('play', 0),
+                            'author': v.get('author', ''),
+                            'url': f"https://www.bilibili.com/video/{bvid}",
+                            'provider': 'Bilibili'
+                        })
+        else:
+            print(f"Bilibili API returned status: {response.status_code}")
+
     except Exception as e:
         logger.error(f"Bilibili search failed: {e}")
         print(f"Bilibili search failed: {e}")
@@ -82,30 +108,32 @@ def call_llm_to_select(topic, last_log, candidates):
         candidates_simple.append({
             'id': i,
             'title': c['title'],
-            'description': c['description'],
-            'duration': c['duration'],
-            'play': c['play'],
-            'author': c['author']
+            'desc': c['description'],
+            'stats': f"Duration: {c['duration']}, Views: {c['play']}",
+            'source': c['provider']
         })
     
     candidates_str = json.dumps(candidates_simple, ensure_ascii=False)
 
     prompt = f"""
-    You are an expert personalized tutor. The user is learning a specific topic.
+    You are an expert personalized tutor. 
     
     User Profile:
     {user_context}
 
     Task:
-    Analyze the following video candidates from Bilibili.
+    Analyze the following video candidates (from Bilibili/YouTube etc).
     Select the SINGLE BEST video that matches the user's current level and specific needs.
-    If the user is a beginner, avoid advanced or obscure content.
-    If the user has specific feedback, prioritize content that addresses it.
+    
+    Selection Criteria:
+    1. Relevance: Must match the topic and level.
+    2. Quality: Prefer high views or good descriptions.
+    3. Accessibility: Bilibili is preferred for Chinese users, but high-quality YouTube content is also acceptable.
     
     Candidates:
     {candidates_str}
 
-    Return ONLY a JSON object with the following format (do not wrap in markdown):
+    Return ONLY a JSON object (no markdown):
     {{
         "selected_id": <int>,
         "reason": "<string, explain why this video is best for the user in Chinese, max 50 words>"
@@ -113,7 +141,7 @@ def call_llm_to_select(topic, last_log, candidates):
     """
 
     try:
-        print(f"Calling LLM ({model})...")
+        print(f"Calling LLM ({model}) with {len(candidates)} candidates...")
         response = requests.post(
             f"{api_base}/chat/completions",
             headers={
@@ -125,7 +153,7 @@ def call_llm_to_select(topic, last_log, candidates):
                 "messages": [{"role": "user", "content": prompt}],
                 "temperature": 0.2
             },
-            timeout=15
+            timeout=20
         )
         
         if response.status_code == 200:
@@ -139,6 +167,7 @@ def call_llm_to_select(topic, last_log, candidates):
             if idx is not None and isinstance(idx, int) and 0 <= idx < len(candidates):
                 selection = candidates[idx]
                 selection['reason'] = result.get('reason', 'AI 智能推荐')
+                print(f"LLM Selected: {selection['title']}")
                 return selection
         else:
             print(f"LLM API Error: {response.status_code} - {response.text}")
@@ -159,49 +188,35 @@ def get_ai_video_recommendation(topic):
     # 2. 构建搜索关键词
     keywords = f"{topic.title} {topic.get_current_level_display()} 教程"
     if last_log and last_log.feedback:
-        # 提取反馈中的关键名词作为补充
         keywords += f" {last_log.feedback[:10]}"
     
-    # 3. 获取候选视频 (Bilibili)
-    print(f"Searching Bilibili for: {keywords}")
-    candidates = search_bilibili_candidates(keywords)
+    # 3. 获取候选视频 (混合源：Bilibili API + DDG)
+    candidates = []
+    
+    # 尝试 Bilibili API
+    bili_candidates = search_bilibili_candidates(keywords, limit=5)
+    candidates.extend(bili_candidates)
+    
+    # 尝试 DDG (作为补充或兜底)
+    # 如果 B站返回少于 3 个，或者作为多样性补充，都调用 DDG
+    if len(candidates) < 5:
+        ddg_candidates = search_candidates_from_ddg(keywords, limit=5)
+        candidates.extend(ddg_candidates)
     
     if not candidates:
-        print("Bilibili search returned no results. Trying DDG...")
-        # 兜底：尝试 DDG
-        try:
-            results = DDGS().videos(keywords=keywords, region="cn-zh", max_results=1)
-            if results:
-                res = results[0]
-                return {
-                    'title': res.get('title'),
-                    'url': res.get('content'),
-                    'reason': "由于 B站 搜索无结果，为您推荐全网相关视频。"
-                }
-        except Exception as e:
-            print(f"DDG Search failed: {e}")
-        
-        # 最后的兜底：如果连搜索都失败了，生成一个基于 LLM 的建议（没有视频 URL，只有建议）
-        # 或者返回 None，前端显示 Bilibili 搜索链接
+        print("No candidates found from any source.")
         return None
 
     # 4. 使用 LLM 选择最佳视频
     selection = call_llm_to_select(topic, last_log, candidates)
     
-    # 5. 降级策略 (如果没有 LLM Key 或调用失败)
+    # 5. 降级策略
     if not selection:
-        print("LLM selection failed or skipped, falling back to rule-based selection.")
-        # 简单规则：选择播放量最高且时长适中（假设 > 5分钟）的
-        # 这里 B站 API 返回的 duration 可能是 "mm:ss" 格式，也可能是秒数，处理比较麻烦，简单按播放量降序
-        # B站 API 返回的 play 可能是数字也可能是字符串
-        def parse_play(p):
-            if isinstance(p, int): return p
-            if isinstance(p, str) and p.isdigit(): return int(p)
-            return 0
-            
-        candidates.sort(key=lambda x: parse_play(x.get('play', 0)), reverse=True)
+        print("LLM selection failed, falling back to rule-based.")
+        # 简单规则：优先 Bilibili，然后按播放量
+        # 归一化播放量逻辑略复杂，这里简单按列表顺序（通常搜索引擎已经排好序了）
         selection = candidates[0]
-        selection['reason'] = f"根据热度为您推荐，该视频播放量较高 ({selection['play']})，深受社区认可。"
+        selection['reason'] = "根据热度为您推荐，该视频在全网搜索中排名靠前。"
 
     return {
         'title': selection['title'],
