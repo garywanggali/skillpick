@@ -49,6 +49,10 @@
                         <button type="submit" class="btn btn-sm btn-outline" style="color: #f0ad4e; border-color: #f0ad4e;" title="暂存（不想学了）"><i class="fa-solid fa-box-archive"></i></button>
                     </form>
                     <a href="{% url 'topic_edit' topic.id %}" class="btn btn-sm btn-outline" title="编辑"><i class="fa-solid fa-pen"></i></a>
+                    <form method="post" action="{% url 'topic_delete' topic.id %}" style="display: inline;" onsubmit="return confirm('确定要永久删除这个主题吗？此操作不可恢复。');">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-sm btn-outline" style="color: #dc3545; border-color: #dc3545;" title="永久删除"><i class="fa-solid fa-trash"></i></button>
+                    </form>
                 </div>
             </div>
             {% if topic.description %}

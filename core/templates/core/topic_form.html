@@ -3,13 +3,44 @@
 {% block content %}
 <div style="max-width: 600px; margin: 0 auto;">
     <h2>{{ title|default:"主题管理" }}</h2>
-    <form method="post">
-        {% csrf_token %}
-        {{ form.as_p }}
-        <div style="margin-top: 20px;">
-            <button type="submit" class="btn">保存</button>
-            <a href="{% url 'dashboard' %}" class="btn btn-outline" style="margin-left: 10px; text-decoration: none;">取消</a>
+    <div class="card">
+        <form method="post">
+            {% csrf_token %}
+            {{ form.as_p }}
+            <div style="margin-top: 20px;">
+                <button type="submit" class="btn btn-block-mobile">保存</button>
+                <a href="{% url 'dashboard' %}" class="btn btn-outline btn-block-mobile" style="margin-left: 10px; text-decoration: none;">取消</a>
+                
+                {% if title == '编辑主题' %}
+                <div class="hide-mobile" style="float: right;">
+                     <button type="submit" form="delete-form" class="btn btn-outline" style="color: #dc3545; border-color: #dc3545;" onclick="return confirm('确定要永久删除这个主题吗？');">
+                        <i class="fa-solid fa-trash"></i> 永久删除
+                    </button>
+                </div>
+                {% endif %}
+            </div>
+        </form>
+        
+        {% if title == '编辑主题' %}
+        <div style="margin-top: 15px; border-top: 1px solid #eee; padding-top: 15px;" class="hide-desktop">
+             <button type="submit" form="delete-form" class="btn btn-outline btn-block-mobile" style="color: #dc3545; border-color: #dc3545; width: 100%;" onclick="return confirm('确定要永久删除这个主题吗？');">
+                <i class="fa-solid fa-trash"></i> 永久删除
+            </button>
         </div>
-    </form>
+        <!-- Hidden delete form -->
+        <form id="delete-form" action="{% url 'topic_delete' form.instance.id %}" method="post" style="display: none;">
+            {% csrf_token %}
+        </form>
+        {% endif %}
+    </div>
 </div>
+
+<style>
+    @media (max-width: 600px) {
+        .hide-desktop { display: block; }
+    }
+    @media (min-width: 601px) {
+        .hide-desktop { display: none; }
+    }
+</style>
 {% endblock %}
