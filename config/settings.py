@@ -25,9 +25,14 @@ SECRET_KEY = 'django-insecure-wwm+@ykcloh@nkdg7imvzcl4eyzcdp1fhv=rhby1=7do&9tqx5
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['thinkfirst.yunguhs.com', 'localhost', '127.0.0.1']
+ALLOWED_HOSTS = ['thinkfirst.yunguhs.com', 'localhost', '127.0.0.1', '*']
 
-CSRF_TRUSTED_ORIGINS = ['https://thinkfirst.yunguhs.com']
+CSRF_TRUSTED_ORIGINS = [
+    'https://thinkfirst.yunguhs.com',
+    'http://thinkfirst.yunguhs.com:9527',
+    'http://localhost:9527',
+    'http://127.0.0.1:9527',
+]
 
 
 # Application definition
