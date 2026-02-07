@@ -1,54 +1,80 @@
 {% extends 'core/base.html' %}
 
 {% block content %}
-<div style="text-align: center; margin-top: 20px;">
-    <h2>今日学习主题</h2>
-    <h1 style="font-size: 2.5em; margin: 20px 0; color: #007bff; word-break: break-word;">{{ topic.title }}</h1>
-    <p>当前等级: <strong>{{ topic.get_current_level_display }}</strong></p>
-    {% if topic.description %}
-        <p style="color: #666;">{{ topic.description }}</p>
-    {% endif %}
-
-    {% if last_log %}
-    <div style="background: #fff3cd; color: #856404; padding: 15px; border-radius: 8px; margin: 20px auto; max-width: 600px; text-align: left; border: 1px solid #ffeeba; box-sizing: border-box;">
-        <h4 style="margin-top: 0;"><i class="fa-solid fa-clock-rotate-left"></i> 上次学习回顾 ({{ last_log.date }})</h4>
-        <p style="margin-bottom: 0;">{{ last_log.feedback|default:"(没有详细记录)" }}</p>
-        <p style="font-size: 0.8em; margin-top: 5px;">时长: {{ last_log.duration_minutes }} 分钟</p>
-    </div>
-    {% endif %}
+<div style="max-width: 800px; margin: 0 auto;">
     
-    <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 30px 0; border: 1px solid #e9ecef;">
-        <h3><i class="fa-solid fa-tv"></i> AI 推荐视频资源</h3>
-        {% if recommendation.recommended_video_url %}
-            <p style="font-size: 1.1em; font-weight: bold;">为您找到以下视频：</p>
-            <div style="background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin: 15px auto; max-width: 500px; box-sizing: border-box;">
-                <p style="margin-top: 0; color: #333; font-weight: bold; word-break: break-word;">{{ recommendation.recommended_video_title }}</p>
-                <a href="{{ recommendation.recommended_video_url }}" target="_blank" class="btn btn-block-mobile" style="background-color: #ff0000; display: block; margin-top: 10px;">
-                    <i class="fa-solid fa-play-circle"></i> 点击观看视频
-                </a>
-            </div>
-            <p style="font-size: 0.9em; color: #666; margin-top: 15px; font-style: italic; word-break: break-word;">
-                <i class="fa-solid fa-lightbulb"></i> 推荐理由: {{ recommendation.recommended_reason }}
-            </p>
-        {% else %}
-            <p>为你精选的搜索关键词:</p>
-            <code style="display:block; margin: 10px; font-size: 1.1em; background: #fff; padding: 10px; border: 1px solid #ddd; word-break: break-word;">{{ search_query }}</code>
-            <a href="{{ video_url }}" target="_blank" class="btn btn-block-mobile" style="background-color: #ff0000; margin-top: 10px;">
-                <i class="fa-solid fa-play-circle"></i> 前往 Bilibili 观看 (建议 5-15 分钟)
-            </a>
-            <p style="font-size: 0.9em; margin-top: 15px; color: #666;">
-                请根据你的当前水平选择合适的视频，观看完毕后记得打卡！
-            </p>
+    <!-- Header -->
+    <div style="text-align: center; margin-bottom: 40px;">
+        <h2 style="color: #999; font-size: 1rem; font-weight: 500; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 10px;">今日学习主题</h2>
+        <h1 style="font-size: 2.8em; margin: 0; color: #333; font-weight: 800; word-break: break-word;">{{ topic.title }}</h1>
+        <div style="margin-top: 15px; display: flex; justify-content: center; gap: 10px;">
+            <span style="background: #e3f2fd; color: #4a90e2; padding: 5px 15px; border-radius: 20px; font-weight: 500; font-size: 0.9rem;">
+                {{ topic.get_current_level_display }}
+            </span>
+        </div>
+        {% if topic.description %}
+            <p style="color: #666; max-width: 600px; margin: 20px auto 0; font-size: 1.1rem;">{{ topic.description }}</p>
         {% endif %}
     </div>
 
-    <div style="margin-top: 40px; border-top: 1px solid #eee; padding-top: 20px; text-align: left; max-width: 600px; margin-left: auto; margin-right: auto;">
-        <h3 style="text-align: center;"><i class="fa-solid fa-clipboard-check"></i> 学习打卡</h3>
-        <form method="post" action="{% url 'log_progress' topic.id %}">
-            {% csrf_token %}
-            {{ form.as_p }}
-            <button type="submit" class="btn btn-block-mobile" style="background-color: #28a745; width: 100%;">保存进度</button>
-        </form>
+    <!-- Last Log Review -->
+    {% if last_log %}
+    <div class="card" style="border-left: 5px solid #f5a623; background: #fffdf5;">
+        <h4 style="margin-top: 0; color: #f5a623; display: flex; align-items: center; gap: 8px;">
+            <i class="fa-solid fa-clock-rotate-left"></i> 上次学习回顾 ({{ last_log.date }})
+        </h4>
+        <p style="margin-bottom: 5px; color: #555; font-size: 1.05rem;">{{ last_log.feedback|default:"(没有详细记录)" }}</p>
+        <p style="font-size: 0.85em; color: #999; margin-top: 10px;">
+            <i class="fa-solid fa-hourglass-half"></i> 时长: {{ last_log.duration_minutes }} 分钟
+        </p>
+    </div>
+    {% endif %}
+    
+    <!-- Video Recommendation -->
+    <div class="card" style="background: white; border: 1px solid #eee; margin-top: 30px;">
+        <h3 style="margin-top: 0; margin-bottom: 20px; display: flex; align-items: center; gap: 10px; color: #333;">
+            <i class="fa-solid fa-tv" style="color: #e74c3c;"></i> AI 推荐资源
+        </h3>
+        
+        {% if recommendation.recommended_video_url %}
+            <div style="background: #f8f9fa; border-radius: 12px; padding: 20px; text-align: center;">
+                <p style="font-size: 1.1rem; font-weight: 600; color: #333; margin-bottom: 15px; word-break: break-word;">
+                    {{ recommendation.recommended_video_title }}
+                </p>
+                <a href="{{ recommendation.recommended_video_url }}" target="_blank" class="btn btn-danger btn-block-mobile" style="padding: 12px 30px; font-size: 1.1rem; border-radius: 30px;">
+                    <i class="fa-solid fa-play-circle"></i> 点击观看视频
+                </a>
+            </div>
+            <div style="margin-top: 15px; padding: 15px; background: #e8f5e9; border-radius: 8px; color: #2e7d32; font-size: 0.95rem; display: flex; gap: 10px; align-items: flex-start;">
+                <i class="fa-solid fa-lightbulb" style="margin-top: 3px;"></i>
+                <span><strong>推荐理由:</strong> {{ recommendation.recommended_reason }}</span>
+            </div>
+        {% else %}
+            <div style="text-align: center; padding: 20px;">
+                <p style="color: #666; margin-bottom: 10px;">为你精选的搜索关键词:</p>
+                <code style="display:block; padding: 15px; background: #f1f3f5; border-radius: 8px; font-size: 1.2rem; color: #333; margin-bottom: 20px; word-break: break-word;">{{ search_query }}</code>
+                <a href="{{ video_url }}" target="_blank" class="btn btn-danger btn-block-mobile" style="padding: 12px 30px; font-size: 1.1rem; border-radius: 30px;">
+                    <i class="fa-solid fa-play-circle"></i> 前往 Bilibili 观看
+                </a>
+                <p style="font-size: 0.9em; color: #999; margin-top: 15px;">建议观看时长: 5-15 分钟</p>
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- Progress Log Form -->
+    <div style="margin-top: 40px; border-top: 1px solid #eee; padding-top: 30px;">
+        <h3 style="text-align: center; margin-bottom: 25px; color: #333; display: flex; align-items: center; justify-content: center; gap: 10px;">
+            <i class="fa-solid fa-clipboard-check" style="color: #2ecc71;"></i> 学习打卡
+        </h3>
+        <div class="card" style="box-shadow: 0 10px 30px rgba(0,0,0,0.08);">
+            <form method="post" action="{% url 'log_progress' topic.id %}">
+                {% csrf_token %}
+                {{ form.as_p }}
+                <button type="submit" class="btn btn-success btn-block-mobile" style="width: 100%; padding: 15px; font-size: 1.1rem; margin-top: 10px;">
+                    <i class="fa-solid fa-check"></i> 完成并保存
+                </button>
+            </form>
+        </div>
     </div>
 </div>
 {% endblock %}

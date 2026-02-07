@@ -2,8 +2,8 @@
 
 {% block content %}
 <div style="max-width: 400px; margin: 0 auto; margin-top: 50px;">
-    <h2 style="text-align: center; margin-bottom: 30px;">注册新账号</h2>
-    <div class="card">
+    <h2 style="text-align: center; margin-bottom: 30px; font-weight: 800; color: #4a90e2;">注册新账号</h2>
+    <div class="card" style="box-shadow: 0 10px 30px rgba(0,0,0,0.08);">
         <form method="post">
             {% csrf_token %}
             {% for field in form %}
@@ -14,13 +14,15 @@
                         <span class="helptext">{{ field.help_text }}</span>
                     {% endif %}
                     {% for error in field.errors %}
-                        <span style="color: red; display: block; font-size: 0.9em;">{{ error }}</span>
+                        <span style="color: #e74c3c; display: block; font-size: 0.9em; margin-top: 5px;"><i class="fa-solid fa-circle-exclamation"></i> {{ error }}</span>
                     {% endfor %}
                 </p>
             {% endfor %}
-            <button type="submit" class="btn btn-block-mobile" style="width: 100%; margin-top: 10px; font-size: 1.1em;">注册</button>
+            <button type="submit" class="btn btn-block-mobile" style="width: 100%; margin-top: 20px; font-size: 1.1em; padding: 12px;">注册</button>
         </form>
     </div>
-    <p style="margin-top: 15px; text-align: center; color: #666;">已经有账号了? <a href="{% url 'login' %}" style="font-weight: bold;">直接登录</a></p>
+    <p style="margin-top: 20px; text-align: center; color: #666;">
+        已经有账号了? <a href="{% url 'login' %}" style="font-weight: 600; color: #4a90e2;">直接登录</a>
+    </p>
 </div>
 {% endblock %}

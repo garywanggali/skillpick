@@ -1,99 +1,130 @@
 {% extends 'core/base.html' %}
 
 {% block content %}
-<h2>我的学习列表</h2>
-
-{% if topics %}
+<div style="display: flex; flex-direction: column; gap: 30px;">
+    
     {% if daily_topic %}
-    <div style="background-color: #e8f5e9; border: 2px solid #4caf50; padding: 20px; border-radius: 8px; margin-bottom: 30px; text-align: center;">
-        <h3 style="margin-top: 0; color: #2e7d32;"><i class="fa-solid fa-star"></i> 今日推荐</h3>
-        <p style="font-size: 1.5em; font-weight: bold; margin: 15px 0;">{{ daily_topic.title }}</p>
-        <p style="color: #555;">当前等级: {{ daily_topic.get_current_level_display }}</p>
-        
-        {% if last_log %}
-        <div style="background: white; padding: 10px; margin: 15px auto; max-width: 80%; border-radius: 4px; text-align: left; border-left: 4px solid #aaa;">
-            <p style="margin: 0; font-size: 0.9em; color: #666;"><strong><i class="fa-solid fa-calendar-check"></i> 上次学习 ({{ last_log.date }}):</strong></p>
-            <p style="margin: 5px 0 0 0;">{{ last_log.feedback|default:"(无详细心得)" }}</p>
-        </div>
-        {% else %}
-        <p style="color: #888; font-size: 0.9em;">(该主题尚未开始学习)</p>
-        {% endif %}
-
-        <div style="margin-top: 20px; display: flex; flex-direction: column; gap: 10px;">
-            {% if recommendation.recommended_video_url %}
-            <a href="{{ recommendation.recommended_video_url }}" target="_blank" class="btn btn-block-mobile" style="background-color: #ff0000;">
-                <i class="fa-solid fa-play-circle"></i> 今日推荐视频
-            </a>
+    <!-- Hero Section: Daily Recommendation -->
+    <div style="background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%); border: none; padding: 30px; border-radius: 16px; text-align: center; box-shadow: 0 10px 20px rgba(46, 204, 113, 0.15); position: relative; overflow: hidden;">
+        <div style="position: relative; z-index: 2;">
+            <h3 style="margin-top: 0; color: #2e7d32; font-size: 1.2rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 15px;">
+                <i class="fa-solid fa-star"></i> 今日推荐
+            </h3>
+            <h1 style="font-size: 2.2em; font-weight: 800; margin: 10px 0 20px 0; color: #1b5e20;">{{ daily_topic.title }}</h1>
+            <p style="color: #388e3c; background: rgba(255,255,255,0.6); display: inline-block; padding: 5px 15px; border-radius: 20px; font-weight: 500;">
+                当前等级: {{ daily_topic.get_current_level_display }}
+            </p>
+            
+            {% if last_log %}
+            <div style="background: white; padding: 15px 20px; margin: 25px auto; max-width: 80%; border-radius: 12px; text-align: left; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border-left: 5px solid #2e7d32;">
+                <p style="margin: 0; font-size: 0.9em; color: #666; display: flex; align-items: center; gap: 5px;">
+                    <i class="fa-solid fa-clock-rotate-left"></i> <strong>上次学习 ({{ last_log.date }}):</strong>
+                </p>
+                <p style="margin: 8px 0 0 0; color: #333;">{{ last_log.feedback|default:"(无详细心得)" }}</p>
+            </div>
             {% else %}
-            <a href="{{ video_url }}" target="_blank" class="btn btn-block-mobile" style="background-color: #ff0000;">
-                <i class="fa-solid fa-play-circle"></i> 查看 Bilibili 搜索结果
-            </a>
+            <p style="color: #666; font-size: 0.95em; margin: 20px 0;">(该主题尚未开始学习，今天是第一天！)</p>
             {% endif %}
-            <a href="{% url 'daily_pick' %}" class="btn btn-block-mobile" style="background-color: #2e7d32;">
-                <i class="fa-solid fa-pen-to-square"></i> 记录学习进度
-            </a>
+    
+            <div style="margin-top: 30px; display: flex; justify-content: center; gap: 15px; flex-wrap: wrap;">
+                {% if recommendation.recommended_video_url %}
+                <a href="{{ recommendation.recommended_video_url }}" target="_blank" class="btn btn-danger btn-block-mobile" style="padding: 12px 25px; font-size: 1rem;">
+                    <i class="fa-solid fa-play-circle"></i> 今日推荐视频
+                </a>
+                {% else %}
+                <a href="{{ video_url }}" target="_blank" class="btn btn-danger btn-block-mobile" style="padding: 12px 25px; font-size: 1rem;">
+                    <i class="fa-solid fa-play-circle"></i> 查看 Bilibili 搜索结果
+                </a>
+                {% endif %}
+                <a href="{% url 'daily_pick' %}" class="btn btn-success btn-block-mobile" style="padding: 12px 25px; font-size: 1rem;">
+                    <i class="fa-solid fa-pen-to-square"></i> 记录学习进度
+                </a>
+            </div>
         </div>
     </div>
     {% endif %}
     
-    {% for topic in topics %}
-        <div class="card">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                <div>
-                    <h3 style="margin: 0; display: inline-block; vertical-align: middle;">{{ topic.title }}</h3>
-                    <span style="background: #eee; padding: 2px 8px; border-radius: 10px; font-size: 0.8em; margin-left: 10px; vertical-align: middle;">{{ topic.get_current_level_display }}</span>
+    <!-- Topics Grid -->
+    <div>
+        <h2 style="font-size: 1.5rem; margin-bottom: 20px; color: #333; display: flex; align-items: center; gap: 10px;">
+            <i class="fa-solid fa-layer-group" style="color: #4a90e2;"></i> 我的学习列表
+        </h2>
+        
+        {% if topics %}
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px;">
+            {% for topic in topics %}
+                <div class="card" style="height: 100%; display: flex; flex-direction: column; margin-bottom: 0;">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px;">
+                        <div>
+                            <h3 style="margin: 0; font-size: 1.2rem; color: #333;">{{ topic.title }}</h3>
+                            <span style="background: #f0f2f5; color: #666; padding: 4px 10px; border-radius: 20px; font-size: 0.8em; margin-top: 8px; display: inline-block;">
+                                {{ topic.get_current_level_display }}
+                            </span>
+                        </div>
+                        <div style="display: flex; gap: 5px;">
+                            <form method="post" action="{% url 'topic_archive' topic.id %}" style="display: inline;">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-sm btn-outline" style="color: #f5a623; border-color: #f5a623;" title="暂存（不想学了）"><i class="fa-solid fa-box-archive"></i></button>
+                            </form>
+                            <a href="{% url 'topic_edit' topic.id %}" class="btn btn-sm btn-outline" title="编辑"><i class="fa-solid fa-pen"></i></a>
+                            <form method="post" action="{% url 'topic_delete' topic.id %}" style="display: inline;" onsubmit="return confirm('确定要永久删除这个主题吗？此操作不可恢复。');">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-sm btn-outline" style="color: #e74c3c; border-color: #e74c3c;" title="永久删除"><i class="fa-solid fa-trash"></i></button>
+                            </form>
+                        </div>
+                    </div>
+                    {% if topic.description %}
+                        <p style="margin: 0 0 15px 0; color: #666; font-size: 0.95em; flex-grow: 1;">{{ topic.description }}</p>
+                    {% else %}
+                        <div style="flex-grow: 1;"></div>
+                    {% endif %}
+                    <div style="border-top: 1px solid #eee; padding-top: 15px; margin-top: auto; font-size: 0.85em; color: #999; display: flex; align-items: center; gap: 5px;">
+                        <i class="fa-regular fa-clock"></i> 上次学习: {{ topic.last_studied|default:"从未开始" }}
+                    </div>
                 </div>
-                <div style="display: flex; gap: 5px;">
-                    <form method="post" action="{% url 'topic_archive' topic.id %}" style="display: inline;">
-                        {% csrf_token %}
-                        <button type="submit" class="btn btn-sm btn-outline" style="color: #f0ad4e; border-color: #f0ad4e;" title="暂存（不想学了）"><i class="fa-solid fa-box-archive"></i></button>
-                    </form>
-                    <a href="{% url 'topic_edit' topic.id %}" class="btn btn-sm btn-outline" title="编辑"><i class="fa-solid fa-pen"></i></a>
-                    <form method="post" action="{% url 'topic_delete' topic.id %}" style="display: inline;" onsubmit="return confirm('确定要永久删除这个主题吗？此操作不可恢复。');">
-                        {% csrf_token %}
-                        <button type="submit" class="btn btn-sm btn-outline" style="color: #dc3545; border-color: #dc3545;" title="永久删除"><i class="fa-solid fa-trash"></i></button>
-                    </form>
-                </div>
-            </div>
-            {% if topic.description %}
-                <p style="margin: 10px 0; color: #555;">{{ topic.description }}</p>
-            {% endif %}
-            <p style="font-size: 0.8em; color: #888; margin-top: 10px;">
-                上次学习: {{ topic.last_studied|default:"从未开始" }}
-            </p>
+            {% endfor %}
         </div>
-    {% endfor %}
+        {% else %}
+        <div style="text-align: center; padding: 50px 20px; background: white; border-radius: 12px; border: 2px dashed #eee;">
+            <div style="font-size: 3rem; color: #ddd; margin-bottom: 20px;"><i class="fa-solid fa-seedling"></i></div>
+            <p style="font-size: 1.1rem; color: #666; margin-bottom: 20px;">你还没有添加任何想学的内容。</p>
+            <a href="{% url 'topic_add' %}" class="btn"><i class="fa-solid fa-plus"></i> 添加第一个主题</a>
+        </div>
+        {% endif %}
+    </div>
 
     {% if archived_topics %}
-    <h3 style="margin-top: 40px; color: #666; border-top: 1px solid #eee; padding-top: 20px;">📦 暂存箱</h3>
-    {% for topic in archived_topics %}
-        <div class="card" style="background-color: #f9f9f9; opacity: 0.8;">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                <div>
-                    <h3 style="margin: 0; display: inline-block; vertical-align: middle; color: #666;">{{ topic.title }}</h3>
-                    <span style="background: #eee; padding: 2px 8px; border-radius: 10px; font-size: 0.8em; margin-left: 10px; vertical-align: middle;">{{ topic.get_current_level_display }}</span>
+    <div style="margin-top: 20px;">
+        <h3 style="margin-bottom: 20px; color: #999; border-top: 1px solid #eee; padding-top: 30px; font-size: 1.1rem; display: flex; align-items: center; gap: 10px;">
+            <i class="fa-solid fa-box"></i> 暂存箱
+        </h3>
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; opacity: 0.7;">
+            {% for topic in archived_topics %}
+                <div class="card" style="background-color: #fafafa; margin-bottom: 0;">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
+                        <div>
+                            <h3 style="margin: 0; font-size: 1.1rem; color: #666;">{{ topic.title }}</h3>
+                            <span style="background: #eee; padding: 2px 8px; border-radius: 10px; font-size: 0.75em; margin-top: 5px; display: inline-block;">{{ topic.get_current_level_display }}</span>
+                        </div>
+                        <div style="display: flex; gap: 5px;">
+                            <form method="post" action="{% url 'topic_archive' topic.id %}" style="display: inline;">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-sm btn-outline" style="color: #2ecc71; border-color: #2ecc71;" title="恢复学习"><i class="fa-solid fa-box-open"></i></button>
+                            </form>
+                            <form method="post" action="{% url 'topic_delete' topic.id %}" style="display: inline;" onsubmit="return confirm('确定要永久删除这个主题吗？此操作不可恢复。');">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-sm btn-outline" style="color: #e74c3c; border-color: #e74c3c;" title="永久删除"><i class="fa-solid fa-trash"></i></button>
+                            </form>
+                        </div>
+                    </div>
+                    <p style="font-size: 0.8em; color: #999; margin: 0;">
+                        已暂存 • 上次学习: {{ topic.last_studied|default:"从未开始" }}
+                    </p>
                 </div>
-                <div style="display: flex; gap: 5px;">
-                    <form method="post" action="{% url 'topic_archive' topic.id %}" style="display: inline;">
-                        {% csrf_token %}
-                        <button type="submit" class="btn btn-sm btn-outline" style="color: #28a745; border-color: #28a745;" title="恢复学习"><i class="fa-solid fa-box-open"></i></button>
-                    </form>
-                    <form method="post" action="{% url 'topic_delete' topic.id %}" style="display: inline;" onsubmit="return confirm('确定要永久删除这个主题吗？此操作不可恢复。');">
-                        {% csrf_token %}
-                        <button type="submit" class="btn btn-sm btn-outline" style="color: #dc3545; border-color: #dc3545;" title="永久删除"><i class="fa-solid fa-trash"></i></button>
-                    </form>
-                </div>
-            </div>
-            <p style="font-size: 0.8em; color: #999; margin-top: 10px;">
-                已暂存 • 上次学习: {{ topic.last_studied|default:"从未开始" }}
-            </p>
+            {% endfor %}
         </div>
-    {% endfor %}
-    {% endif %}
-{% else %}
-    <div style="text-align: center; margin-top: 50px;">
-        <p>你还没有添加任何想学的内容。</p>
-        <a href="{% url 'topic_add' %}" class="btn">添加第一个主题</a>
     </div>
-{% endif %}
+    {% endif %}
+    
+</div>
 {% endblock %}
