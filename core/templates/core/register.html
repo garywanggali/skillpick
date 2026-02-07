@@ -2,27 +2,27 @@
 
 {% block content %}
 <div style="max-width: 400px; margin: 0 auto; margin-top: 50px;">
-    <h2 style="text-align: center; margin-bottom: 30px; font-weight: 800; color: #4a90e2;">注册新账号</h2>
-    <div class="card" style="box-shadow: 0 10px 30px rgba(0,0,0,0.08);">
+    <h2 style="text-align: center; margin-bottom: 40px; font-weight: 300; color: #fff; letter-spacing: 2px;">JOIN US</h2>
+    <div class="card" style="box-shadow: none; border: 1px solid #333; background: #000;">
         <form method="post">
             {% csrf_token %}
             {% for field in form %}
                 <p>
-                    <label for="{{ field.id_for_label }}">{{ field.label }}:</label>
+                    <label for="{{ field.id_for_label }}" style="text-transform: uppercase;">{{ field.label }}</label>
                     {{ field }}
                     {% if field.help_text %}
-                        <span class="helptext">{{ field.help_text }}</span>
+                        <span class="helptext" style="color: #555;">{{ field.help_text }}</span>
                     {% endif %}
                     {% for error in field.errors %}
-                        <span style="color: #e74c3c; display: block; font-size: 0.9em; margin-top: 5px;"><i class="fa-solid fa-circle-exclamation"></i> {{ error }}</span>
+                        <span style="color: #e74c3c; display: block; font-size: 0.9em; margin-top: 5px;"><i class="fa-solid fa-triangle-exclamation"></i> {{ error }}</span>
                     {% endfor %}
                 </p>
             {% endfor %}
-            <button type="submit" class="btn btn-block-mobile" style="width: 100%; margin-top: 20px; font-size: 1.1em; padding: 12px;">注册</button>
+            <button type="submit" class="btn btn-block-mobile" style="width: 100%; margin-top: 30px; font-size: 1rem; padding: 15px; border: 1px solid #fff; background: white; color: black; font-weight: 500; letter-spacing: 2px;">注册</button>
         </form>
     </div>
-    <p style="margin-top: 20px; text-align: center; color: #666;">
-        已经有账号了? <a href="{% url 'login' %}" style="font-weight: 600; color: #4a90e2;">直接登录</a>
+    <p style="margin-top: 30px; text-align: center; color: #666; font-size: 0.9rem;">
+        已经有账号了? <a href="{% url 'login' %}" style="font-weight: 300; color: #fff; border-bottom: 1px solid #fff; text-decoration: none; padding-bottom: 2px;">直接登录</a>
     </p>
 </div>
 {% endblock %}

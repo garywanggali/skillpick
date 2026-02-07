@@ -4,73 +4,73 @@
 <div style="max-width: 800px; margin: 0 auto;">
     
     <!-- Header -->
-    <div style="text-align: center; margin-bottom: 40px;">
-        <h2 style="color: #999; font-size: 1rem; font-weight: 500; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 10px;">今日学习主题</h2>
-        <h1 style="font-size: 2.8em; margin: 0; color: #333; font-weight: 800; word-break: break-word;">{{ topic.title }}</h1>
-        <div style="margin-top: 15px; display: flex; justify-content: center; gap: 10px;">
-            <span style="background: #e3f2fd; color: #4a90e2; padding: 5px 15px; border-radius: 20px; font-weight: 500; font-size: 0.9rem;">
+    <div style="text-align: center; margin-bottom: 50px;">
+        <h2 style="color: #666; font-size: 0.9rem; font-weight: 300; text-transform: uppercase; letter-spacing: 3px; margin-bottom: 15px;">今日学习主题</h2>
+        <h1 style="font-size: 3em; margin: 0; color: #fff; font-weight: 300; word-break: break-word; letter-spacing: 2px;">{{ topic.title }}</h1>
+        <div style="margin-top: 20px; display: flex; justify-content: center; gap: 10px;">
+            <span style="border: 1px solid #fff; color: #fff; padding: 5px 20px; font-weight: 300; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px;">
                 {{ topic.get_current_level_display }}
             </span>
         </div>
         {% if topic.description %}
-            <p style="color: #666; max-width: 600px; margin: 20px auto 0; font-size: 1.1rem;">{{ topic.description }}</p>
+            <p style="color: #888; max-width: 600px; margin: 25px auto 0; font-size: 1.1rem; font-weight: 300; line-height: 1.8;">{{ topic.description }}</p>
         {% endif %}
     </div>
 
     <!-- Last Log Review -->
     {% if last_log %}
-    <div class="card" style="border-left: 5px solid #f5a623; background: #fffdf5;">
-        <h4 style="margin-top: 0; color: #f5a623; display: flex; align-items: center; gap: 8px;">
+    <div class="card" style="border-left: 3px solid #f5a623; background: #000; padding: 25px;">
+        <h4 style="margin-top: 0; color: #f5a623; display: flex; align-items: center; gap: 10px; font-weight: 300; letter-spacing: 1px;">
             <i class="fa-solid fa-clock-rotate-left"></i> 上次学习回顾 ({{ last_log.date }})
         </h4>
-        <p style="margin-bottom: 5px; color: #555; font-size: 1.05rem;">{{ last_log.feedback|default:"(没有详细记录)" }}</p>
-        <p style="font-size: 0.85em; color: #999; margin-top: 10px;">
+        <p style="margin-bottom: 5px; color: #ccc; font-size: 1.05rem; font-weight: 300;">{{ last_log.feedback|default:"(没有详细记录)" }}</p>
+        <p style="font-size: 0.85em; color: #666; margin-top: 15px;">
             <i class="fa-solid fa-hourglass-half"></i> 时长: {{ last_log.duration_minutes }} 分钟
         </p>
     </div>
     {% endif %}
     
     <!-- Video Recommendation -->
-    <div class="card" style="background: white; border: 1px solid #eee; margin-top: 30px;">
-        <h3 style="margin-top: 0; margin-bottom: 20px; display: flex; align-items: center; gap: 10px; color: #333;">
-            <i class="fa-solid fa-tv" style="color: #e74c3c;"></i> AI 推荐资源
+    <div class="card" style="background: #000; border: 1px solid #333; margin-top: 40px; padding: 30px;">
+        <h3 style="margin-top: 0; margin-bottom: 25px; display: flex; align-items: center; gap: 10px; color: #fff; font-weight: 300; letter-spacing: 2px; border-bottom: 1px solid #222; padding-bottom: 15px;">
+            <i class="fa-solid fa-tv"></i> AI 推荐资源
         </h3>
         
         {% if recommendation.recommended_video_url %}
-            <div style="background: #f8f9fa; border-radius: 12px; padding: 20px; text-align: center;">
-                <p style="font-size: 1.1rem; font-weight: 600; color: #333; margin-bottom: 15px; word-break: break-word;">
+            <div style="background: #050505; border: 1px solid #222; padding: 30px; text-align: center;">
+                <p style="font-size: 1.2rem; font-weight: 300; color: #fff; margin-bottom: 25px; word-break: break-word;">
                     {{ recommendation.recommended_video_title }}
                 </p>
-                <a href="{{ recommendation.recommended_video_url }}" target="_blank" class="btn btn-danger btn-block-mobile" style="padding: 12px 30px; font-size: 1.1rem; border-radius: 30px;">
+                <a href="{{ recommendation.recommended_video_url }}" target="_blank" class="btn btn-danger btn-block-mobile" style="padding: 12px 40px; font-size: 1rem;">
                     <i class="fa-solid fa-play-circle"></i> 点击观看视频
                 </a>
             </div>
-            <div style="margin-top: 15px; padding: 15px; background: #e8f5e9; border-radius: 8px; color: #2e7d32; font-size: 0.95rem; display: flex; gap: 10px; align-items: flex-start;">
-                <i class="fa-solid fa-lightbulb" style="margin-top: 3px;"></i>
-                <span><strong>推荐理由:</strong> {{ recommendation.recommended_reason }}</span>
+            <div style="margin-top: 20px; padding: 15px; border: 1px solid #222; color: #888; font-size: 0.95rem; display: flex; gap: 10px; align-items: flex-start;">
+                <i class="fa-solid fa-lightbulb" style="margin-top: 3px; color: #fff;"></i>
+                <span style="font-weight: 300;"><strong>推荐理由:</strong> {{ recommendation.recommended_reason }}</span>
             </div>
         {% else %}
             <div style="text-align: center; padding: 20px;">
-                <p style="color: #666; margin-bottom: 10px;">为你精选的搜索关键词:</p>
-                <code style="display:block; padding: 15px; background: #f1f3f5; border-radius: 8px; font-size: 1.2rem; color: #333; margin-bottom: 20px; word-break: break-word;">{{ search_query }}</code>
-                <a href="{{ video_url }}" target="_blank" class="btn btn-danger btn-block-mobile" style="padding: 12px 30px; font-size: 1.1rem; border-radius: 30px;">
+                <p style="color: #666; margin-bottom: 15px; font-weight: 300;">为你精选的搜索关键词:</p>
+                <code style="display:block; padding: 20px; background: #050505; border: 1px solid #222; font-size: 1.2rem; color: #fff; margin-bottom: 25px; word-break: break-word; font-family: monospace;">{{ search_query }}</code>
+                <a href="{{ video_url }}" target="_blank" class="btn btn-danger btn-block-mobile" style="padding: 12px 40px; font-size: 1rem;">
                     <i class="fa-solid fa-play-circle"></i> 前往 Bilibili 观看
                 </a>
-                <p style="font-size: 0.9em; color: #999; margin-top: 15px;">建议观看时长: 5-15 分钟</p>
+                <p style="font-size: 0.9em; color: #444; margin-top: 20px;">建议观看时长: 5-15 分钟</p>
             </div>
         {% endif %}
     </div>
 
     <!-- Progress Log Form -->
-    <div style="margin-top: 40px; border-top: 1px solid #eee; padding-top: 30px;">
-        <h3 style="text-align: center; margin-bottom: 25px; color: #333; display: flex; align-items: center; justify-content: center; gap: 10px;">
-            <i class="fa-solid fa-clipboard-check" style="color: #2ecc71;"></i> 学习打卡
+    <div style="margin-top: 50px; border-top: 1px solid #222; padding-top: 40px;">
+        <h3 style="text-align: center; margin-bottom: 30px; color: #fff; display: flex; align-items: center; justify-content: center; gap: 10px; font-weight: 300; letter-spacing: 2px;">
+            <i class="fa-solid fa-clipboard-check"></i> 学习打卡
         </h3>
-        <div class="card" style="box-shadow: 0 10px 30px rgba(0,0,0,0.08);">
+        <div class="card" style="background: #000;">
             <form method="post" action="{% url 'log_progress' topic.id %}">
                 {% csrf_token %}
                 {{ form.as_p }}
-                <button type="submit" class="btn btn-success btn-block-mobile" style="width: 100%; padding: 15px; font-size: 1.1rem; margin-top: 10px;">
+                <button type="submit" class="btn btn-success btn-block-mobile" style="width: 100%; padding: 15px; font-size: 1.1rem; margin-top: 15px; text-transform: uppercase; letter-spacing: 1px;">
                     <i class="fa-solid fa-check"></i> 完成并保存
                 </button>
             </form>
