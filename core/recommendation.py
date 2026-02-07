@@ -184,17 +184,38 @@ from .models import LearningLog, TopicRecommendationCache
 
 # ... (keep imports)
 
+def search_youtube_via_ddg(keywords, limit=3):
+    """
+    通过 DuckDuckGo 专门搜索 YouTube 视频
+    """
+    print(f"Searching YouTube (via DDG) for: {keywords}")
+    candidates = []
+    try:
+        # 强制指定 site:youtube.com
+        results = DDGS().videos(keywords=f"site:youtube.com {keywords}", region="wt-wt", safesearch="off", max_results=limit)
+        
+        if results:
+            for r in results:
+                candidates.append({
+                    'title': r.get('title', 'No Title'),
+                    'description': r.get('description', '')[:150],
+                    'duration': r.get('duration', 'N/A'),
+                    'play': r.get('views', 0),
+                    'author': r.get('publisher', 'YouTube'),
+                    'url': r.get('content', '#'),
+                    'provider': 'YouTube'
+                })
+    except Exception as e:
+        print(f"YouTube Search failed: {e}")
+        
+    return candidates
+
 def get_ai_video_recommendation(topic):
     """
     基于 Topic 和学习记录，智能推荐一个视频。
     优先查询缓存，缓存未命中则调用搜索+LLM，并写入缓存。
     """
     # 1. 尝试从缓存获取
-    # 构建缓存 Key：Keyword + Level
-    # (如果上次学习有反馈，也可以把反馈加入 key，但为了提高命中率，这里暂时只按 Topic+Level 缓存)
-    # 只有当用户没有反馈时，或者反馈很简单时，才用通用缓存。
-    # 这里为了演示效果，我们先简化逻辑：只要 Topic+Level 匹配，且 30 天内，就复用。
-    
     last_log = LearningLog.objects.filter(topic=topic).order_by('-created_at').first()
     keywords = f"{topic.title} {topic.get_current_level_display()} 教程"
     if last_log and last_log.feedback:
@@ -217,14 +238,19 @@ def get_ai_video_recommendation(topic):
     
     print(f"Cache MISS for: {keywords}. Searching...")
 
-    # 3. 获取候选视频 (混合源：Bilibili API + DDG)
+    # 3. 获取候选视频 (多源并行)
     candidates = []
     
-    # 尝试 Bilibili API
+    # Source A: Bilibili API (国内首选)
     bili_candidates = search_bilibili_candidates(keywords, limit=5)
     candidates.extend(bili_candidates)
     
-    # 尝试 DDG (作为补充或兜底)
+    # Source B: YouTube (通过 DDG, 全球首选)
+    # 只有当 B站结果不够多，或者为了多样性时才搜
+    yt_candidates = search_youtube_via_ddg(keywords, limit=3)
+    candidates.extend(yt_candidates)
+
+    # Source C: General DDG (全网兜底)
     if len(candidates) < 5:
         ddg_candidates = search_candidates_from_ddg(keywords, limit=5)
         candidates.extend(ddg_candidates)
@@ -243,7 +269,7 @@ def get_ai_video_recommendation(topic):
         selection = candidates[0]
         selection['reason'] = "根据热度为您推荐，该视频在全网搜索中排名靠前。"
 
-    # 7. 写入缓存 (只有当 LLM 成功选择或降级选择有效时)
+    # 7. 写入缓存
     if selection:
         try:
             TopicRecommendationCache.objects.create(
