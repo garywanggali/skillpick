@@ -124,7 +124,10 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 
-# Default primary key field type
-# https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
+import os
 
-DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+# LLM Configuration (SiliconFlow)
+OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', 'sk-njtjzhjzsnbcepvbnqwuhuffomxqkjjfuvvoanfssuzmdcai')
+OPENAI_API_BASE = os.environ.get('OPENAI_API_BASE', 'https://api.siliconflow.cn/v1')
+OPENAI_MODEL = os.environ.get('OPENAI_MODEL', 'deepseek-ai/DeepSeek-V3')
+
