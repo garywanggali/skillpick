@@ -178,18 +178,45 @@ def call_llm_to_select(topic, last_log, candidates):
         
     return None
 
+from django.utils import timezone
+from datetime import timedelta
+from .models import LearningLog, TopicRecommendationCache
+
+# ... (keep imports)
+
 def get_ai_video_recommendation(topic):
     """
     基于 Topic 和学习记录，智能推荐一个视频。
+    优先查询缓存，缓存未命中则调用搜索+LLM，并写入缓存。
     """
-    # 1. 获取上次学习反馈
-    last_log = LearningLog.objects.filter(topic=topic).order_by('-created_at').first()
+    # 1. 尝试从缓存获取
+    # 构建缓存 Key：Keyword + Level
+    # (如果上次学习有反馈，也可以把反馈加入 key，但为了提高命中率，这里暂时只按 Topic+Level 缓存)
+    # 只有当用户没有反馈时，或者反馈很简单时，才用通用缓存。
+    # 这里为了演示效果，我们先简化逻辑：只要 Topic+Level 匹配，且 30 天内，就复用。
     
-    # 2. 构建搜索关键词
+    last_log = LearningLog.objects.filter(topic=topic).order_by('-created_at').first()
     keywords = f"{topic.title} {topic.get_current_level_display()} 教程"
     if last_log and last_log.feedback:
         keywords += f" {last_log.feedback[:10]}"
     
+    # Check Cache
+    cache = TopicRecommendationCache.objects.filter(
+        topic_keyword=keywords,
+        level=topic.current_level,
+        created_at__gte=timezone.now() - timedelta(days=30)
+    ).order_by('-created_at').first()
+    
+    if cache:
+        print(f"Cache HIT for: {keywords}")
+        return {
+            'title': cache.video_title,
+            'url': cache.video_url,
+            'reason': cache.reason
+        }
+    
+    print(f"Cache MISS for: {keywords}. Searching...")
+
     # 3. 获取候选视频 (混合源：Bilibili API + DDG)
     candidates = []
     
@@ -215,6 +242,20 @@ def get_ai_video_recommendation(topic):
         print("LLM selection failed, falling back to rule-based.")
         selection = candidates[0]
         selection['reason'] = "根据热度为您推荐，该视频在全网搜索中排名靠前。"
+
+    # 7. 写入缓存 (只有当 LLM 成功选择或降级选择有效时)
+    if selection:
+        try:
+            TopicRecommendationCache.objects.create(
+                topic_keyword=keywords,
+                level=topic.current_level,
+                video_title=selection['title'],
+                video_url=selection['url'],
+                reason=selection['reason']
+            )
+            print("Recommendation cached successfully.")
+        except Exception as e:
+            print(f"Failed to cache recommendation: {e}")
 
     return {
         'title': selection['title'],

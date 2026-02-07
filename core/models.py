@@ -44,3 +44,28 @@ class DailyRecommendation(models.Model):
 
     def __str__(self):
         return f"{self.user.username} - {self.date} - {self.topic.title}"
+
+class TopicRecommendationCache(models.Model):
+    """
+    全局缓存：针对特定主题关键词和等级的 AI 推荐结果。
+    避免重复调用搜索 API 和 LLM。
+    """
+    topic_keyword = models.CharField(max_length=200, db_index=True) # 例如 "Python 入门"
+    level = models.CharField(max_length=50)
+    
+    video_title = models.CharField(max_length=500)
+    video_url = models.URLField(max_length=500)
+    reason = models.TextField(help_text="AI推荐理由")
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        # 针对同一关键词和等级，只保留一份最新的缓存
+        # 但考虑到不同人可能搜同一个词，这里不强制 unique，查询时取最新的即可
+        indexes = [
+            models.Index(fields=['topic_keyword', 'level']),
+        ]
+
+    def __str__(self):
+        return f"Cache: {self.topic_keyword} ({self.level})"
