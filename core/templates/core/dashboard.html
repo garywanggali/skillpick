@@ -11,9 +11,16 @@
                 <i class="fa-solid fa-star" style="color: #fff;"></i> 今日推荐
             </h3>
             <h1 style="font-size: 2.5em; font-weight: 300; margin: 10px 0 20px 0; color: #fff; letter-spacing: 1px;">{{ daily_topic.title }}</h1>
-            <p style="color: #888; border: 1px solid #333; display: inline-block; padding: 5px 20px; font-weight: 300; font-size: 0.9rem;">
-                当前等级: {{ daily_topic.get_current_level_display }}
-            </p>
+            <div style="display: flex; gap: 10px; justify-content: center; margin-bottom: 20px;">
+                <span style="color: #888; border: 1px solid #333; padding: 5px 20px; font-weight: 300; font-size: 0.9rem;">
+                    当前等级: {{ daily_topic.get_current_level_display }}
+                </span>
+                {% if recommendation.recommended_video_duration %}
+                <span style="color: #888; border: 1px solid #333; padding: 5px 20px; font-weight: 300; font-size: 0.9rem;">
+                    <i class="fa-regular fa-clock"></i> {{ recommendation.recommended_video_duration }}
+                </span>
+                {% endif %}
+            </div>
             
             {% if last_log %}
             <div style="background: #000; padding: 20px; margin: 30px auto; max-width: 80%; border: 1px solid #333; text-align: left; border-left: 3px solid #fff;">
@@ -38,6 +45,9 @@
                 {% endif %}
                 <a href="{% url 'daily_pick' %}" class="btn btn-success btn-block-mobile" style="padding: 10px 30px; font-size: 0.95rem;">
                     <i class="fa-solid fa-pen-to-square"></i> 记录学习进度
+                </a>
+                <a href="{% url 'refresh_rec' %}" class="btn btn-outline btn-block-mobile" style="padding: 10px 30px; font-size: 0.95rem; border-color: #666; color: #aaa;" onclick="return confirm('换一个会删除当前的推荐记录并重新随机选择，确定吗？');">
+                    <i class="fa-solid fa-rotate"></i> 换一个主题
                 </a>
             </div>
         </div>
@@ -80,12 +90,19 @@
         </h2>
         
         {% if topics %}
-        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 25px;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; align-items: start;">
             {% for topic in topics %}
                 <div class="card" style="height: 100%; display: flex; flex-direction: column; margin-bottom: 0;">
-                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px;">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px;">
                         <div>
-                            <h3 style="margin: 0; font-size: 1.2rem; color: #fff; font-weight: 400;">{{ topic.title }}</h3>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <h3 style="margin: 0; font-size: 1.2rem; color: #fff; font-weight: 400;">{{ topic.title }}</h3>
+                                {% if topic.priority == 'high' %}
+                                    <span style="color: #ff4d4d; font-size: 0.7em; border: 1px solid #ff4d4d; padding: 1px 5px; border-radius: 2px;">HIGH</span>
+                                {% elif topic.priority == 'low' %}
+                                    <span style="color: #666; font-size: 0.7em; border: 1px solid #444; padding: 1px 5px; border-radius: 2px;">LOW</span>
+                                {% endif %}
+                            </div>
                             <span style="color: #666; font-size: 0.8em; margin-top: 8px; display: inline-block; border: 1px solid #333; padding: 2px 8px;">
                                 {{ topic.get_current_level_display }}
                             </span>

@@ -380,7 +380,8 @@ def get_ai_video_recommendation(topic):
         return {
             'title': cache.video_title,
             'url': cache.video_url,
-            'reason': cache.reason
+            'reason': cache.reason,
+            'duration': cache.video_duration
         }
     
     print(f"Cache MISS for: {keywords}. Starting Multi-Source Search...")
@@ -459,6 +460,7 @@ def get_ai_video_recommendation(topic):
                 level=topic.current_level,
                 video_title=selection['title'],
                 video_url=selection['url'],
+                video_duration=selection.get('duration'),
                 reason=selection['reason']
             )
             print("Recommendation cached successfully.")
@@ -468,7 +470,8 @@ def get_ai_video_recommendation(topic):
     return {
         'title': selection['title'],
         'url': selection['url'],
-        'reason': selection['reason']
+        'reason': selection['reason'],
+        'duration': selection.get('duration')
     }
 
 def call_llm_for_blind_suggestion(topic, last_log):

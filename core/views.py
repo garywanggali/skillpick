@@ -19,10 +19,11 @@ from django.views.decorators.http import require_POST
 class TopicForm(forms.ModelForm):
     class Meta:
         model = Topic
-        fields = ['title', 'current_level', 'description']
+        fields = ['title', 'current_level', 'priority', 'description']
         labels = {
             'title': '想学什么',
             'current_level': '当前水平',
+            'priority': '优先级',
             'description': '具体描述',
         }
 
@@ -148,7 +149,7 @@ def record_popup_action(request):
 @require_POST
 def generate_recommendation_api(request):
     """
-    异步生成推荐 API
+    异步生成推荐 API (支持加权随机)
     """
     today = date.today()
     
@@ -159,8 +160,19 @@ def generate_recommendation_api(request):
     topics = Topic.objects.filter(user=request.user, is_archived=False)
     if not topics.exists():
         return JsonResponse({'status': 'no_topics'})
+    
+    # 加权随机逻辑
+    weighted_topics = []
+    for t in topics:
+        weight = 1
+        if t.priority == 'high':
+            weight = 3
+        elif t.priority == 'medium':
+            weight = 2
         
-    selected_topic = random.choice(list(topics))
+        weighted_topics.extend([t] * weight)
+        
+    selected_topic = random.choice(weighted_topics)
     
     # 耗时操作：多源搜索 + LLM
     ai_rec = get_ai_video_recommendation(selected_topic)
@@ -172,6 +184,7 @@ def generate_recommendation_api(request):
             date=today,
             recommended_video_title=ai_rec['title'] if ai_rec else None,
             recommended_video_url=ai_rec['url'] if ai_rec else None,
+            recommended_video_duration=ai_rec.get('duration') if ai_rec else None,
             recommended_reason=ai_rec['reason'] if ai_rec else None
         )
         return JsonResponse({'status': 'created'})
@@ -220,11 +233,21 @@ def daily_pick(request):
         selected_topic = recommendation.topic
     else:
         # 如果没有推荐（可能还没访问 Dashboard，或者没有 Topics），尝试生成
-        topics = Topic.objects.filter(user=request.user)
+        topics = Topic.objects.filter(user=request.user, is_archived=False)
         if not topics.exists():
             return redirect('topic_add')
         
-        selected_topic = random.choice(list(topics))
+        # 加权随机
+        weighted_topics = []
+        for t in topics:
+            weight = 1
+            if t.priority == 'high':
+                weight = 3
+            elif t.priority == 'medium':
+                weight = 2
+            weighted_topics.extend([t] * weight)
+
+        selected_topic = random.choice(weighted_topics)
         
         # 调用 AI 推荐服务
         ai_rec = get_ai_video_recommendation(selected_topic)
@@ -236,6 +259,7 @@ def daily_pick(request):
                 date=today,
                 recommended_video_title=ai_rec['title'] if ai_rec else None,
                 recommended_video_url=ai_rec['url'] if ai_rec else None,
+                recommended_video_duration=ai_rec.get('duration') if ai_rec else None,
                 recommended_reason=ai_rec['reason'] if ai_rec else None
             )
         except IntegrityError:
