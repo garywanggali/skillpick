@@ -167,6 +167,7 @@ def get_ai_video_recommendation(topic):
     candidates = search_bilibili_candidates(keywords)
     
     if not candidates:
+        print("Bilibili search returned no results. Trying DDG...")
         # 兜底：尝试 DDG
         try:
             results = DDGS().videos(keywords=keywords, region="cn-zh", max_results=1)
@@ -177,8 +178,11 @@ def get_ai_video_recommendation(topic):
                     'url': res.get('content'),
                     'reason': "由于 B站 搜索无结果，为您推荐全网相关视频。"
                 }
-        except:
-            pass
+        except Exception as e:
+            print(f"DDG Search failed: {e}")
+        
+        # 最后的兜底：如果连搜索都失败了，生成一个基于 LLM 的建议（没有视频 URL，只有建议）
+        # 或者返回 None，前端显示 Bilibili 搜索链接
         return None
 
     # 4. 使用 LLM 选择最佳视频
