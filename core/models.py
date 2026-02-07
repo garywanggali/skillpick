@@ -12,6 +12,7 @@ class Topic(models.Model):
     title = models.CharField(max_length=200)
     current_level = models.CharField(max_length=50, choices=LEVEL_CHOICES, default='beginner')
     description = models.TextField(blank=True, help_text="具体想学什么，比如'咖啡拉花'")
+    is_archived = models.BooleanField(default=False, help_text="是否暂存（不想学了）")
     created_at = models.DateTimeField(auto_now_add=True)
     last_studied = models.DateTimeField(null=True, blank=True)
 

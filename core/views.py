@@ -49,10 +49,14 @@ class DashboardView(LoginRequiredMixin, ListView):
     context_object_name = 'topics'
 
     def get_queryset(self):
-        return Topic.objects.filter(user=self.request.user).order_by('-last_studied', '-created_at')
+        # 默认只显示未归档的主题
+        return Topic.objects.filter(user=self.request.user, is_archived=False).order_by('-last_studied', '-created_at')
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        # 获取归档的主题
+        context['archived_topics'] = Topic.objects.filter(user=self.request.user, is_archived=True).order_by('-created_at')
+        
         # 获取或生成今日推荐
         today = date.today()
         recommendation = DailyRecommendation.objects.filter(user=self.request.user, date=today).first()
@@ -189,4 +193,19 @@ def refresh_recommendation(request):
     """
     today = date.today()
     DailyRecommendation.objects.filter(user=request.user, date=today).delete()
+    return redirect('dashboard')
+
+@login_required
+def toggle_archive_topic(request, pk):
+    topic = get_object_or_404(Topic, pk=pk, user=request.user)
+    if request.method == 'POST':
+        topic.is_archived = not topic.is_archived
+        topic.save()
+    return redirect('dashboard')
+
+@login_required
+def delete_topic(request, pk):
+    topic = get_object_or_404(Topic, pk=pk, user=request.user)
+    if request.method == 'POST':
+        topic.delete()
     return redirect('dashboard')
