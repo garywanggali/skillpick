@@ -6,20 +6,34 @@ import os
 import json
 import logging
 import requests
+import re
+import urllib.parse
 from duckduckgo_search import DDGS
 from .models import LearningLog
 from django.conf import settings
+from django.utils import timezone
+from datetime import timedelta
+from .models import LearningLog, TopicRecommendationCache
 
 logger = logging.getLogger(__name__)
 
+# 精选视频库 (最后防线)
+HARDCODED_VIDEOS = {
+    'python': {'title': 'Python 教程 - 廖雪峰', 'url': 'https://www.bilibili.com/video/BV1wD4y1o7AS'},
+    'java': {'title': 'Java 零基础教程 - 韩顺平', 'url': 'https://www.bilibili.com/video/BV1fh411y7R8'},
+    '英语': {'title': '英语口语天天练', 'url': 'https://www.bilibili.com/video/BV154411u7Uf'},
+    '健身': {'title': '帕梅拉 10分钟全身燃脂', 'url': 'https://www.bilibili.com/video/BV1pK411p7d6'},
+    '足球': {'title': '足球基础教学 - 停球与传球', 'url': 'https://www.bilibili.com/video/BV1Cx411q7t5'},
+    'default': {'title': 'Bilibili 热门教程', 'url': 'https://www.bilibili.com/v/technology/computer/'}
+}
+
 def search_candidates_from_ddg(keywords, limit=5):
     """
-    使用 DuckDuckGo 搜索视频（包含 YouTube, Bilibili 等）
+    使用 DuckDuckGo 搜索视频
     """
     candidates = []
     try:
         print(f"Searching DDG for: {keywords}")
-        # region="cn-zh" 优先中文结果，safesearch="off" 避免过度过滤
         results = DDGS().videos(keywords=keywords, region="cn-zh", safesearch="off", max_results=limit)
         
         if results:
@@ -28,7 +42,7 @@ def search_candidates_from_ddg(keywords, limit=5):
                     'title': r.get('title', 'No Title'),
                     'description': r.get('description', '')[:150],
                     'duration': r.get('duration', 'N/A'),
-                    'play': r.get('views', 0), # DDG 返回的是 views
+                    'play': r.get('views', 0),
                     'author': r.get('publisher', 'Unknown'),
                     'url': r.get('content', '#'),
                     'provider': 'DuckDuckGo'
@@ -40,8 +54,13 @@ def search_candidates_from_ddg(keywords, limit=5):
     return candidates
 
 def search_bilibili_candidates(keywords, limit=5):
-    # ... (existing code)
+    """
+    使用 Bilibili API 搜索视频，返回候选列表。
+    如果 API 失败 (412)，尝试 HTML 解析。
+    """
     candidates = []
+    
+    # 1. 尝试 API
     try:
         print(f"Searching Bilibili API for: {keywords}")
         url = "http://api.bilibili.com/x/web-interface/search/type"
@@ -56,7 +75,6 @@ def search_bilibili_candidates(keywords, limit=5):
         }
         
         response = requests.get(url, params=params, headers=headers, timeout=5)
-        # response.raise_for_status() # B站有时返回412，不抛出异常以便继续尝试其他源
         
         if response.status_code == 200:
             data = response.json()
@@ -75,13 +93,46 @@ def search_bilibili_candidates(keywords, limit=5):
                             'url': f"https://www.bilibili.com/video/{bvid}",
                             'provider': 'Bilibili'
                         })
+                return candidates # 如果 API 成功，直接返回
         else:
             print(f"Bilibili API returned status: {response.status_code}")
 
     except Exception as e:
-        logger.error(f"Bilibili search failed: {e}")
-        print(f"Bilibili search failed: {e}")
-    
+        logger.error(f"Bilibili API search failed: {e}")
+        print(f"Bilibili API search failed: {e}")
+
+    # 2. 如果 API 失败，尝试 HTML 解析 (Bilibili Web Scraper)
+    try:
+        print(f"Attempting Bilibili HTML Scrape for: {keywords}")
+        url = "https://search.bilibili.com/all"
+        params = {'keyword': keywords}
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.114 Safari/537.36',
+            'Referer': 'https://www.bilibili.com/'
+        }
+        response = requests.get(url, params=params, headers=headers, timeout=5)
+        
+        if response.status_code == 200:
+            matches = re.finditer(r'//www\.bilibili\.com/video/(?P<bvid>BV[a-zA-Z0-9]+)', response.text)
+            seen_bvids = set()
+            
+            for match in matches:
+                bvid = match.group('bvid')
+                if bvid not in seen_bvids:
+                    seen_bvids.add(bvid)
+                    candidates.append({
+                        'title': f"Bilibili Video {bvid} (Parsed)",
+                        'description': 'Parsed from search page',
+                        'duration': 'N/A',
+                        'play': 0,
+                        'author': 'Bilibili',
+                        'url': f"https://www.bilibili.com/video/{bvid}",
+                        'provider': 'Bilibili (Web)'
+                    })
+                    if len(candidates) >= limit: break
+    except Exception as e:
+        print(f"Bilibili HTML Scrape failed: {e}")
+
     return candidates
 
 def search_zhihu_candidates(keywords, limit=3):
@@ -99,10 +150,10 @@ def search_zhihu_candidates(keywords, limit=3):
             'offset': 0,
             'limit': limit * 2
         }
-        # 知乎需要真实的 User-Agent
+        # 修复编码问题
         headers = {
             'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.114 Safari/537.36',
-            'Referer': 'https://www.zhihu.com/search?type=content&q=' + keywords
+            'Referer': 'https://www.zhihu.com/search?type=content&q=' + urllib.parse.quote(keywords)
         }
         resp = requests.get(url, params=params, headers=headers, timeout=5)
         
@@ -124,7 +175,6 @@ def search_zhihu_candidates(keywords, limit=3):
                     elif type_ == 'search_result' and 'title' in obj: # 通用结果
                         title = obj.get('title', '').replace('<em>', '').replace('</em>', '')
                         desc = obj.get('content', '')[:100]
-                        # 构造 URL 比较复杂，简化处理
                         if 'id' in obj:
                             url = f"https://www.zhihu.com/question/{obj.get('question', {}).get('id')}/answer/{obj.get('id')}"
                     
@@ -133,7 +183,7 @@ def search_zhihu_candidates(keywords, limit=3):
                             'title': title,
                             'description': desc,
                             'duration': 'N/A',
-                            'play': obj.get('voteup_count', 0), # 用点赞数代替
+                            'play': obj.get('voteup_count', 0),
                             'author': obj.get('author', {}).get('name', ''),
                             'url': url,
                             'provider': 'Zhihu'
@@ -143,110 +193,6 @@ def search_zhihu_candidates(keywords, limit=3):
         print(f"Zhihu Search failed: {e}")
         
     return candidates
-
-def call_llm_to_select(topic, last_log, candidates):
-    """
-    调用大模型（OpenAI 兼容接口）从候选中选择最佳视频
-    """
-    api_key = getattr(settings, 'OPENAI_API_KEY', None) or os.environ.get('OPENAI_API_KEY')
-    api_base = getattr(settings, 'OPENAI_API_BASE', 'https://api.openai.com/v1')
-    model = getattr(settings, 'OPENAI_MODEL', 'gpt-3.5-turbo')
-
-    if not api_key:
-        print("Warning: No OPENAI_API_KEY found. Skipping AI selection.")
-        return None
-
-    # 构建 Prompt
-    user_context = f"""
-    User Topic: {topic.title}
-    Current Level: {topic.get_current_level_display()}
-    Description: {topic.description}
-    Last Study Feedback: {last_log.feedback if last_log else "None"}
-    """
-    
-    # 简化候选列表以减少 Token
-    candidates_simple = []
-    for i, c in enumerate(candidates):
-        candidates_simple.append({
-            'id': i,
-            'title': c['title'],
-            'desc': c['description'],
-            'stats': f"Duration: {c['duration']}, Views: {c['play']}",
-            'source': c['provider']
-        })
-    
-    candidates_str = json.dumps(candidates_simple, ensure_ascii=False)
-
-    prompt = f"""
-    You are an expert personalized tutor. 
-    
-    User Profile:
-    {user_context}
-
-    Task:
-    Analyze the following video candidates (from Bilibili/YouTube etc).
-    Select the SINGLE BEST video that matches the user's current level and specific needs.
-    
-    Selection Criteria:
-    1. Relevance: Must match the topic and level.
-    2. Quality: Prefer high views or good descriptions.
-    3. Accessibility: Bilibili is preferred for Chinese users, but high-quality YouTube content is also acceptable.
-    
-    Candidates:
-    {candidates_str}
-
-    Return ONLY a JSON object (no markdown):
-    {{
-        "selected_id": <int>,
-        "reason": "<string, explain why this video is best for the user in Chinese, max 50 words>"
-    }}
-    """
-
-    try:
-        print(f"Calling LLM ({model}) with {len(candidates)} candidates...")
-        response = requests.post(
-            f"{api_base}/chat/completions",
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json"
-            },
-            json={
-                "model": model,
-                "messages": [{"role": "user", "content": prompt}],
-                "temperature": 0.2
-            },
-            timeout=20
-        )
-        
-        if response.status_code == 200:
-            resp_json = response.json()
-            content = resp_json['choices'][0]['message']['content']
-            # 清理可能的 Markdown 标记
-            content = content.replace('```json', '').replace('```', '').strip()
-            result = json.loads(content)
-            
-            idx = result.get('selected_id')
-            if idx is not None and isinstance(idx, int) and 0 <= idx < len(candidates):
-                selection = candidates[idx]
-                selection['reason'] = result.get('reason', 'AI 智能推荐')
-                print(f"LLM Selected: {selection['title']}")
-                return selection
-        else:
-            print(f"LLM API Error: {response.status_code} - {response.text}")
-            
-    except Exception as e:
-        logger.error(f"LLM call failed: {e}")
-        print(f"LLM call failed: {e}")
-        
-    return None
-
-from django.utils import timezone
-from datetime import timedelta
-from .models import LearningLog, TopicRecommendationCache
-
-# ... (keep imports)
-
-import re
 
 def search_sohu_candidates(keywords, limit=3):
     """
@@ -262,10 +208,7 @@ def search_sohu_candidates(keywords, limit=3):
         }
         resp = requests.get(url, params=params, headers=headers, timeout=5)
         
-        # 简单的正则提取 (搜狐视频结果页结构相对固定)
-        # 寻找类似 <a href="//tv.sohu.com/v/..." target="_blank" title="..."> 的链接
         if resp.status_code == 200:
-            # 提取视频块
             pattern = r'<a href="(?P<url>//tv\.sohu\.com/v/[^"]+)"[^>]*title="(?P<title>[^"]+)"'
             matches = re.finditer(pattern, resp.text)
             
@@ -306,8 +249,6 @@ def search_360_candidates(keywords, limit=3):
         resp = requests.get(url, params=params, headers=headers, timeout=5)
         
         if resp.status_code == 200:
-            # 使用简单的正则提取列表中的视频链接
-            # 寻找 <li class="item ..."> ... <a href="..." ... title="...">
             links = re.findall(r'<a[^>]+href="([^"]+)"[^>]+title="([^"]+)"[^>]*>', resp.text)
             
             for link, title in links:
@@ -328,12 +269,99 @@ def search_360_candidates(keywords, limit=3):
         
     return candidates
 
+def call_llm_to_select(topic, last_log, candidates):
+    """
+    调用大模型（OpenAI 兼容接口）从候选中选择最佳视频
+    """
+    api_key = getattr(settings, 'OPENAI_API_KEY', None) or os.environ.get('OPENAI_API_KEY')
+    api_base = getattr(settings, 'OPENAI_API_BASE', 'https://api.openai.com/v1')
+    model = getattr(settings, 'OPENAI_MODEL', 'gpt-3.5-turbo')
+
+    if not api_key:
+        print("Warning: No OPENAI_API_KEY found. Skipping AI selection.")
+        return None
+
+    user_context = f"""
+    User Topic: {topic.title}
+    Current Level: {topic.get_current_level_display()}
+    Description: {topic.description}
+    Last Study Feedback: {last_log.feedback if last_log else "None"}
+    """
+    
+    candidates_simple = []
+    for i, c in enumerate(candidates):
+        candidates_simple.append({
+            'id': i,
+            'title': c['title'],
+            'desc': c['description'],
+            'stats': f"Duration: {c['duration']}, Views: {c['play']}",
+            'source': c['provider']
+        })
+    
+    candidates_str = json.dumps(candidates_simple, ensure_ascii=False)
+
+    prompt = f"""
+    You are an expert personalized tutor. 
+    
+    User Profile:
+    {user_context}
+
+    Task:
+    Analyze the following video candidates.
+    Select the SINGLE BEST video that matches the user's current level and specific needs.
+    
+    Candidates:
+    {candidates_str}
+
+    Return ONLY a JSON object (no markdown):
+    {{
+        "selected_id": <int>,
+        "reason": "<string, explain why this video is best for the user in Chinese, max 50 words>"
+    }}
+    """
+
+    try:
+        print(f"Calling LLM ({model}) with {len(candidates)} candidates...")
+        response = requests.post(
+            f"{api_base}/chat/completions",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "model": model,
+                "messages": [{"role": "user", "content": prompt}],
+                "temperature": 0.2
+            },
+            timeout=20
+        )
+        
+        if response.status_code == 200:
+            resp_json = response.json()
+            content = resp_json['choices'][0]['message']['content']
+            content = content.replace('```json', '').replace('```', '').strip()
+            result = json.loads(content)
+            
+            idx = result.get('selected_id')
+            if idx is not None and isinstance(idx, int) and 0 <= idx < len(candidates):
+                selection = candidates[idx]
+                selection['reason'] = result.get('reason', 'AI 智能推荐')
+                print(f"LLM Selected: {selection['title']}")
+                return selection
+        else:
+            print(f"LLM API Error: {response.status_code} - {response.text}")
+            
+    except Exception as e:
+        logger.error(f"LLM call failed: {e}")
+        print(f"LLM call failed: {e}")
+        
+    return None
+
 def get_ai_video_recommendation(topic):
     """
     基于 Topic 和学习记录，智能推荐一个视频。
     优先查询缓存，缓存未命中则调用搜索+LLM，并写入缓存。
     """
-    # ... (cache logic)
     # 1. 尝试从缓存获取
     last_log = LearningLog.objects.filter(topic=topic).order_by('-created_at').first()
     keywords = f"{topic.title} {topic.get_current_level_display()} 教程"
@@ -360,7 +388,7 @@ def get_ai_video_recommendation(topic):
     # 3. 获取候选视频 (多源并行)
     candidates = []
     
-    # Source A: Bilibili API
+    # Source A: Bilibili API & Web
     bili = search_bilibili_candidates(keywords, limit=5)
     print(f"[Source: Bilibili] Found {len(bili)} videos")
     candidates.extend(bili)
@@ -371,19 +399,19 @@ def get_ai_video_recommendation(topic):
         print(f"[Source: Zhihu] Found {len(zhihu)} videos")
         candidates.extend(zhihu)
 
-    # Source C: Sohu (新增)
+    # Source C: Sohu
     if len(candidates) < 5:
         sohu = search_sohu_candidates(keywords, limit=3)
         print(f"[Source: Sohu] Found {len(sohu)} videos")
         candidates.extend(sohu)
 
-    # Source D: 360 (新增)
+    # Source D: 360
     if len(candidates) < 5:
         so360 = search_360_candidates(keywords, limit=3)
         print(f"[Source: 360] Found {len(so360)} videos")
         candidates.extend(so360)
 
-    # Source E: General DDG (最后兜底)
+    # Source E: DDG
     if len(candidates) < 3:
         ddg = search_candidates_from_ddg(keywords, limit=3)
         print(f"[Source: DDG] Found {len(ddg)} videos")
@@ -391,12 +419,29 @@ def get_ai_video_recommendation(topic):
     
     print(f"Total Candidates Collected: {len(candidates)}")
 
-    # 4. Blind LLM Fallback
+    # 4. Fallback Logic
     if not candidates:
-        print("No candidates found. Using Blind LLM Fallback.")
-        return call_llm_for_blind_suggestion(topic, last_log)
+        print("No candidates found. Trying Hardcoded Fallback...")
+        # 4.1 Hardcoded Fallback
+        for key, video in HARDCODED_VIDEOS.items():
+            if key in topic.title.lower():
+                print(f"Hardcoded Fallback HIT: {key}")
+                candidates.append({
+                    'title': video['title'],
+                    'description': '系统精选推荐',
+                    'duration': 'N/A',
+                    'play': 999999,
+                    'author': 'System',
+                    'url': video['url'],
+                    'provider': 'System Fallback'
+                })
+                break
+        
+        # 4.2 If still empty, use Blind LLM
+        if not candidates:
+            print("No candidates found. Using Blind LLM Fallback.")
+            return call_llm_for_blind_suggestion(topic, last_log)
 
-    # ... (rest logic)
     # 5. 使用 LLM 选择最佳视频
     selection = call_llm_to_select(topic, last_log, candidates)
     
