@@ -188,63 +188,90 @@ from .models import LearningLog, TopicRecommendationCache
 
 # ... (keep imports)
 
-def search_zhihu_candidates(keywords, limit=3):
+import re
+
+def search_sohu_candidates(keywords, limit=3):
     """
-    搜索知乎视频和回答
+    搜索搜狐视频 (HTML解析)
     """
-    print(f"Searching Zhihu for: {keywords}")
+    print(f"Searching Sohu for: {keywords}")
     candidates = []
     try:
-        url = "https://www.zhihu.com/api/v4/search_v3"
-        params = {
-            't': 'general',
-            'q': keywords,
-            'correction': 1,
-            'offset': 0,
-            'limit': limit * 2
-        }
-        # 知乎需要真实的 User-Agent
+        url = "https://so.tv.sohu.com/mts"
+        params = {'wd': keywords}
         headers = {
-            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.114 Safari/537.36',
-            'Referer': 'https://www.zhihu.com/search?type=content&q=' + keywords
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.114 Safari/537.36'
+        }
+        resp = requests.get(url, params=params, headers=headers, timeout=5)
+        
+        # 简单的正则提取 (搜狐视频结果页结构相对固定)
+        # 寻找类似 <a href="//tv.sohu.com/v/..." target="_blank" title="..."> 的链接
+        if resp.status_code == 200:
+            # 提取视频块
+            pattern = r'<a href="(?P<url>//tv\.sohu\.com/v/[^"]+)"[^>]*title="(?P<title>[^"]+)"'
+            matches = re.finditer(pattern, resp.text)
+            
+            for match in matches:
+                url = match.group('url')
+                if url.startswith('//'): url = 'https:' + url
+                
+                candidates.append({
+                    'title': match.group('title'),
+                    'description': '搜狐视频搜索结果',
+                    'duration': 'N/A',
+                    'play': 0,
+                    'author': 'Sohu',
+                    'url': url,
+                    'provider': 'Sohu'
+                })
+                if len(candidates) >= limit: break
+        else:
+            print(f"Sohu returned status: {resp.status_code}")
+            
+    except Exception as e:
+        print(f"Sohu Search failed: {e}")
+        
+    return candidates
+
+def search_360_candidates(keywords, limit=3):
+    """
+    搜索360视频 (聚合源)
+    """
+    print(f"Searching 360 Video for: {keywords}")
+    candidates = []
+    try:
+        url = "https://video.so.com/v"
+        params = {'q': keywords}
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.114 Safari/537.36'
         }
         resp = requests.get(url, params=params, headers=headers, timeout=5)
         
         if resp.status_code == 200:
-            data = resp.json()
-            if 'data' in data:
-                for item in data['data']:
-                    obj = item.get('object', {})
-                    type_ = item.get('type')
-                    
-                    title = ""
-                    desc = ""
-                    url = ""
-                    
-                    if type_ == 'zvideo': # 视频
-                        title = obj.get('title', '')
-                        desc = obj.get('description', '')
-                        url = f"https://www.zhihu.com/zvideo/{obj.get('id')}"
-                    elif type_ == 'search_result' and 'title' in obj: # 通用结果
-                        title = obj.get('title', '').replace('<em>', '').replace('</em>', '')
-                        desc = obj.get('content', '')[:100]
-                        # 构造 URL 比较复杂，简化处理
-                        if 'id' in obj:
-                            url = f"https://www.zhihu.com/question/{obj.get('question', {}).get('id')}/answer/{obj.get('id')}"
-                    
-                    if title and url:
-                        candidates.append({
-                            'title': title,
-                            'description': desc,
-                            'duration': 'N/A',
-                            'play': obj.get('voteup_count', 0), # 用点赞数代替
-                            'author': obj.get('author', {}).get('name', ''),
-                            'url': url,
-                            'provider': 'Zhihu'
-                        })
-                        if len(candidates) >= limit: break
+            # 360视频结果通常在 <a href="..." data-md='{...}'> 中
+            # 简单提取 href 和 title
+            # 360结构较复杂，这里尝试提取主要列表项
+            # class="title" -> <a href="...">text</a>
+            
+            # 使用简单的正则提取列表中的视频链接
+            # 寻找 <li class="item ..."> ... <a href="..." ... title="...">
+            links = re.findall(r'<a[^>]+href="([^"]+)"[^>]+title="([^"]+)"[^>]*>', resp.text)
+            
+            for link, title in links:
+                if 'video.so.com/view' in link or 'v.qq.com' in link or 'iqiyi.com' in link:
+                     candidates.append({
+                        'title': title,
+                        'description': '360视频聚合搜索',
+                        'duration': 'N/A',
+                        'play': 0,
+                        'author': '360',
+                        'url': link if link.startswith('http') else 'https:'+link,
+                        'provider': '360 Video'
+                    })
+                if len(candidates) >= limit: break
+                
     except Exception as e:
-        print(f"Zhihu Search failed: {e}")
+        print(f"360 Search failed: {e}")
         
     return candidates
 
@@ -275,28 +302,42 @@ def get_ai_video_recommendation(topic):
             'reason': cache.reason
         }
     
-    print(f"Cache MISS for: {keywords}. Searching...")
+    print(f"Cache MISS for: {keywords}. Starting Multi-Source Search...")
 
     # 3. 获取候选视频 (多源并行)
     candidates = []
     
     # Source A: Bilibili API
-    bili_candidates = search_bilibili_candidates(keywords, limit=5)
-    candidates.extend(bili_candidates)
+    bili = search_bilibili_candidates(keywords, limit=5)
+    print(f"[Source: Bilibili] Found {len(bili)} videos")
+    candidates.extend(bili)
     
-    # Source B: Zhihu (新增国内源)
-    # 当 B站结果少时，补充知乎
+    # Source B: Zhihu
     if len(candidates) < 5:
-        zhihu_candidates = search_zhihu_candidates(keywords, limit=3)
-        candidates.extend(zhihu_candidates)
+        zhihu = search_zhihu_candidates(keywords, limit=3)
+        print(f"[Source: Zhihu] Found {len(zhihu)} videos")
+        candidates.extend(zhihu)
 
-    # Source C: General DDG (最后兜底，如果连得上)
-    # 暂时移除 DDG 以避免超时，或者放在最后 try-except
+    # Source C: Sohu (新增)
+    if len(candidates) < 5:
+        sohu = search_sohu_candidates(keywords, limit=3)
+        print(f"[Source: Sohu] Found {len(sohu)} videos")
+        candidates.extend(sohu)
+
+    # Source D: 360 (新增)
+    if len(candidates) < 5:
+        so360 = search_360_candidates(keywords, limit=3)
+        print(f"[Source: 360] Found {len(so360)} videos")
+        candidates.extend(so360)
+
+    # Source E: General DDG (最后兜底)
     if len(candidates) < 3:
-        # 只有当前面都没搜到时才试 DDG
-        ddg_candidates = search_candidates_from_ddg(keywords, limit=3)
-        candidates.extend(ddg_candidates)
+        ddg = search_candidates_from_ddg(keywords, limit=3)
+        print(f"[Source: DDG] Found {len(ddg)} videos")
+        candidates.extend(ddg)
     
+    print(f"Total Candidates Collected: {len(candidates)}")
+
     # 4. Blind LLM Fallback
     if not candidates:
         print("No candidates found. Using Blind LLM Fallback.")
