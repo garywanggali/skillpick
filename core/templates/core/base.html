@@ -232,6 +232,15 @@
     {% if user.is_authenticated %}
     <script>
         document.addEventListener('DOMContentLoaded', function() {
+            // Request Notification Permission on load
+            if ("Notification" in window) {
+                if (Notification.permission !== "granted" && Notification.permission !== "denied") {
+                    Notification.requestPermission().then(permission => {
+                        console.log("Notification permission:", permission);
+                    });
+                }
+            }
+
             // Check Daily Popup
             fetch("{% url 'api_check_popup' %}")
             .then(response => response.json())
@@ -240,10 +249,9 @@
                     const popup = document.getElementById('daily-popup');
                     const content = document.getElementById('popup-content');
                     
-                    // Show modal
+                    // 1. Show web modal
                     popup.style.display = 'flex';
                     
-                    // Update content
                     content.innerHTML = `
                         <h2 style="color: #fff; margin: 15px 0;">${data.topic}</h2>
                         <p style="color: #aaa; font-size: 0.9em; margin-bottom: 25px;">${data.reason}</p>
@@ -252,6 +260,21 @@
                             <button onclick="handlePopup('accepted', '${data.url}')" class="btn btn-success">行吧，去看看</button>
                         </div>
                     `;
+
+                    // 2. Trigger System Notification
+                    if ("Notification" in window && Notification.permission === "granted") {
+                        const notification = new Notification("SkillPick 今日推荐", {
+                            body: `${data.topic}：${data.reason}`,
+                            icon: "https://cdn-icons-png.flaticon.com/512/2991/2991148.png", // 这里的图标可以换成你自己的 logo url
+                            requireInteraction: true // 让通知一直显示直到用户点击
+                        });
+                        
+                        notification.onclick = function() {
+                            window.focus();
+                            handlePopup('accepted', data.url);
+                            notification.close();
+                        };
+                    }
                 }
             });
         });
