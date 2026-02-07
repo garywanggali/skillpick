@@ -40,9 +40,7 @@ def search_candidates_from_ddg(keywords, limit=5):
     return candidates
 
 def search_bilibili_candidates(keywords, limit=5):
-    """
-    使用 Bilibili API 搜索视频，返回候选列表
-    """
+    # ... (existing code)
     candidates = []
     try:
         print(f"Searching Bilibili API for: {keywords}")
@@ -84,6 +82,66 @@ def search_bilibili_candidates(keywords, limit=5):
         logger.error(f"Bilibili search failed: {e}")
         print(f"Bilibili search failed: {e}")
     
+    return candidates
+
+def search_zhihu_candidates(keywords, limit=3):
+    """
+    搜索知乎视频和回答
+    """
+    print(f"Searching Zhihu for: {keywords}")
+    candidates = []
+    try:
+        url = "https://www.zhihu.com/api/v4/search_v3"
+        params = {
+            't': 'general',
+            'q': keywords,
+            'correction': 1,
+            'offset': 0,
+            'limit': limit * 2
+        }
+        # 知乎需要真实的 User-Agent
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.114 Safari/537.36',
+            'Referer': 'https://www.zhihu.com/search?type=content&q=' + keywords
+        }
+        resp = requests.get(url, params=params, headers=headers, timeout=5)
+        
+        if resp.status_code == 200:
+            data = resp.json()
+            if 'data' in data:
+                for item in data['data']:
+                    obj = item.get('object', {})
+                    type_ = item.get('type')
+                    
+                    title = ""
+                    desc = ""
+                    url = ""
+                    
+                    if type_ == 'zvideo': # 视频
+                        title = obj.get('title', '')
+                        desc = obj.get('description', '')
+                        url = f"https://www.zhihu.com/zvideo/{obj.get('id')}"
+                    elif type_ == 'search_result' and 'title' in obj: # 通用结果
+                        title = obj.get('title', '').replace('<em>', '').replace('</em>', '')
+                        desc = obj.get('content', '')[:100]
+                        # 构造 URL 比较复杂，简化处理
+                        if 'id' in obj:
+                            url = f"https://www.zhihu.com/question/{obj.get('question', {}).get('id')}/answer/{obj.get('id')}"
+                    
+                    if title and url:
+                        candidates.append({
+                            'title': title,
+                            'description': desc,
+                            'duration': 'N/A',
+                            'play': obj.get('voteup_count', 0), # 用点赞数代替
+                            'author': obj.get('author', {}).get('name', ''),
+                            'url': url,
+                            'provider': 'Zhihu'
+                        })
+                        if len(candidates) >= limit: break
+    except Exception as e:
+        print(f"Zhihu Search failed: {e}")
+        
     return candidates
 
 def call_llm_to_select(topic, last_log, candidates):
@@ -248,11 +306,6 @@ def search_360_candidates(keywords, limit=3):
         resp = requests.get(url, params=params, headers=headers, timeout=5)
         
         if resp.status_code == 200:
-            # 360视频结果通常在 <a href="..." data-md='{...}'> 中
-            # 简单提取 href 和 title
-            # 360结构较复杂，这里尝试提取主要列表项
-            # class="title" -> <a href="...">text</a>
-            
             # 使用简单的正则提取列表中的视频链接
             # 寻找 <li class="item ..."> ... <a href="..." ... title="...">
             links = re.findall(r'<a[^>]+href="([^"]+)"[^>]+title="([^"]+)"[^>]*>', resp.text)
