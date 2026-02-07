@@ -289,6 +289,15 @@ def refresh_recommendation(request):
     return redirect('dashboard')
 
 @login_required
+def reset_daily_popup(request):
+    """
+    调试用：重置今日弹窗记录，让它能再次弹出
+    """
+    today = date.today()
+    DailyPopupRecord.objects.filter(user=request.user, date=today).delete()
+    return redirect('dashboard')
+
+@login_required
 def toggle_archive_topic(request, pk):
     topic = get_object_or_404(Topic, pk=pk, user=request.user)
     if request.method == 'POST':
