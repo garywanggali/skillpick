@@ -14,4 +14,5 @@ urlpatterns = [
     path('daily/', views.daily_pick, name='daily_pick'),
     path('log/<int:topic_id>/', views.log_progress, name='log_progress'),
     path('refresh-rec/', views.refresh_recommendation, name='refresh_rec'),
+    path('api/generate-rec/', views.generate_recommendation_api, name='api_generate_rec'),
 ]

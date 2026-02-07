@@ -12,6 +12,8 @@ from django.utils import timezone
 from datetime import date
 from .recommendation import get_ai_video_recommendation
 from django.db import IntegrityError
+from django.http import JsonResponse
+from django.views.decorators.http import require_POST
 
 # Forms
 class TopicForm(forms.ModelForm):
@@ -58,30 +60,9 @@ class DashboardView(LoginRequiredMixin, ListView):
         # 获取归档的主题
         context['archived_topics'] = Topic.objects.filter(user=self.request.user, is_archived=True).order_by('-created_at')
         
-        # 获取或生成今日推荐
+        # 获取今日推荐
         today = date.today()
         recommendation = DailyRecommendation.objects.filter(user=self.request.user, date=today).first()
-        
-        if not recommendation:
-            topics = list(self.get_queryset())
-            if topics:
-                selected_topic = random.choice(topics)
-                
-                # 调用 AI 推荐服务
-                ai_rec = get_ai_video_recommendation(selected_topic)
-                
-                try:
-                    recommendation = DailyRecommendation.objects.create(
-                        user=self.request.user,
-                        topic=selected_topic,
-                        date=today,
-                        recommended_video_title=ai_rec['title'] if ai_rec else None,
-                        recommended_video_url=ai_rec['url'] if ai_rec else None,
-                        recommended_reason=ai_rec['reason'] if ai_rec else None
-                    )
-                except IntegrityError:
-                    # 如果并发请求导致已存在，则重新获取
-                    recommendation = DailyRecommendation.objects.filter(user=self.request.user, date=today).first()
         
         if recommendation:
             context['daily_topic'] = recommendation.topic
@@ -94,8 +75,48 @@ class DashboardView(LoginRequiredMixin, ListView):
                 level_display = recommendation.topic.get_current_level_display()
                 search_query = f"{recommendation.topic.title} {level_display} 教程"
                 context['video_url'] = f"https://search.bilibili.com/all?keyword={search_query}"
+        else:
+            # 如果没有推荐，且有未归档主题，标记需要生成，由前端 AJAX 触发
+            if self.get_queryset().exists():
+                context['need_generation'] = True
             
         return context
+
+@login_required
+@require_POST
+def generate_recommendation_api(request):
+    """
+    异步生成推荐 API
+    """
+    today = date.today()
+    
+    # Check if already exists
+    if DailyRecommendation.objects.filter(user=request.user, date=today).exists():
+        return JsonResponse({'status': 'exists'})
+        
+    topics = Topic.objects.filter(user=request.user, is_archived=False)
+    if not topics.exists():
+        return JsonResponse({'status': 'no_topics'})
+        
+    selected_topic = random.choice(list(topics))
+    
+    # 耗时操作：多源搜索 + LLM
+    ai_rec = get_ai_video_recommendation(selected_topic)
+    
+    try:
+        DailyRecommendation.objects.create(
+            user=request.user,
+            topic=selected_topic,
+            date=today,
+            recommended_video_title=ai_rec['title'] if ai_rec else None,
+            recommended_video_url=ai_rec['url'] if ai_rec else None,
+            recommended_reason=ai_rec['reason'] if ai_rec else None
+        )
+        return JsonResponse({'status': 'created'})
+    except IntegrityError:
+        return JsonResponse({'status': 'exists'})
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)})
 
 class TopicCreateView(LoginRequiredMixin, CreateView):
     model = Topic

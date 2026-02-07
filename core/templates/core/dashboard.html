@@ -42,6 +42,35 @@
             </div>
         </div>
     </div>
+    {% elif need_generation %}
+    <!-- Loading Section -->
+    <div id="loading-section" style="background: #111; border: 1px dashed #333; padding: 50px 20px; border-radius: 0; text-align: center;">
+        <i class="fa-solid fa-circle-notch fa-spin" style="font-size: 3rem; color: #fff; margin-bottom: 20px;"></i>
+        <h3 style="color: #fff; font-weight: 300;">正在为您全网搜寻最佳教程...</h3>
+        <p style="color: #666; font-size: 0.9rem;">AI 正在分析 Bilibili、知乎及全球资源，请稍候片刻</p>
+    </div>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            fetch("{% url 'api_generate_rec' %}", {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': '{{ csrf_token }}',
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'created' || data.status === 'exists') {
+                    window.location.reload();
+                } else {
+                    console.error('Generation failed:', data);
+                    // 可以选择刷新或显示错误
+                    // window.location.reload(); 
+                }
+            })
+            .catch(error => console.error('Error:', error));
+        });
+    </script>
     {% endif %}
     
     <!-- Topics Grid -->
