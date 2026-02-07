@@ -25,7 +25,7 @@ SECRET_KEY = 'django-insecure-wwm+@ykcloh@nkdg7imvzcl4eyzcdp1fhv=rhby1=7do&9tqx5
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['thinkfirst.yunguhs.com', 'localhost', '127.0.0.1']
 
 
 # Application definition
