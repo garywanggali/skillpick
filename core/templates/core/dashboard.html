@@ -19,17 +19,17 @@
         <p style="color: #888; font-size: 0.9em;">(该主题尚未开始学习)</p>
         {% endif %}
 
-        <div style="margin-top: 20px;">
+        <div style="margin-top: 20px; display: flex; flex-direction: column; gap: 10px;">
             {% if recommendation.recommended_video_url %}
-            <a href="{{ recommendation.recommended_video_url }}" target="_blank" class="btn" style="background-color: #ff0000; margin-right: 10px;">
+            <a href="{{ recommendation.recommended_video_url }}" target="_blank" class="btn btn-block-mobile" style="background-color: #ff0000;">
                 <i class="fa-solid fa-play-circle"></i> 今日推荐视频
             </a>
             {% else %}
-            <a href="{{ video_url }}" target="_blank" class="btn" style="background-color: #ff0000; margin-right: 10px;">
+            <a href="{{ video_url }}" target="_blank" class="btn btn-block-mobile" style="background-color: #ff0000;">
                 <i class="fa-solid fa-play-circle"></i> 查看 Bilibili 搜索结果
             </a>
             {% endif %}
-            <a href="{% url 'daily_pick' %}" class="btn" style="background-color: #2e7d32;">
+            <a href="{% url 'daily_pick' %}" class="btn btn-block-mobile" style="background-color: #2e7d32;">
                 <i class="fa-solid fa-pen-to-square"></i> 记录学习进度
             </a>
         </div>
@@ -43,7 +43,13 @@
                     <h3 style="margin: 0; display: inline-block; vertical-align: middle;">{{ topic.title }}</h3>
                     <span style="background: #eee; padding: 2px 8px; border-radius: 10px; font-size: 0.8em; margin-left: 10px; vertical-align: middle;">{{ topic.get_current_level_display }}</span>
                 </div>
-                <a href="{% url 'topic_edit' topic.id %}" class="btn btn-sm btn-outline" style="margin-left: 15px;"><i class="fa-solid fa-pen"></i> 编辑</a>
+                <div style="display: flex; gap: 5px;">
+                    <form method="post" action="{% url 'topic_archive' topic.id %}" style="display: inline;">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-sm btn-outline" style="color: #f0ad4e; border-color: #f0ad4e;" title="暂存（不想学了）"><i class="fa-solid fa-box-archive"></i></button>
+                    </form>
+                    <a href="{% url 'topic_edit' topic.id %}" class="btn btn-sm btn-outline" title="编辑"><i class="fa-solid fa-pen"></i></a>
+                </div>
             </div>
             {% if topic.description %}
                 <p style="margin: 10px 0; color: #555;">{{ topic.description }}</p>
@@ -53,6 +59,33 @@
             </p>
         </div>
     {% endfor %}
+
+    {% if archived_topics %}
+    <h3 style="margin-top: 40px; color: #666; border-top: 1px solid #eee; padding-top: 20px;">📦 暂存箱</h3>
+    {% for topic in archived_topics %}
+        <div class="card" style="background-color: #f9f9f9; opacity: 0.8;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                <div>
+                    <h3 style="margin: 0; display: inline-block; vertical-align: middle; color: #666;">{{ topic.title }}</h3>
+                    <span style="background: #eee; padding: 2px 8px; border-radius: 10px; font-size: 0.8em; margin-left: 10px; vertical-align: middle;">{{ topic.get_current_level_display }}</span>
+                </div>
+                <div style="display: flex; gap: 5px;">
+                    <form method="post" action="{% url 'topic_archive' topic.id %}" style="display: inline;">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-sm btn-outline" style="color: #28a745; border-color: #28a745;" title="恢复学习"><i class="fa-solid fa-box-open"></i></button>
+                    </form>
+                    <form method="post" action="{% url 'topic_delete' topic.id %}" style="display: inline;" onsubmit="return confirm('确定要永久删除这个主题吗？此操作不可恢复。');">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-sm btn-outline" style="color: #dc3545; border-color: #dc3545;" title="永久删除"><i class="fa-solid fa-trash"></i></button>
+                    </form>
+                </div>
+            </div>
+            <p style="font-size: 0.8em; color: #999; margin-top: 10px;">
+                已暂存 • 上次学习: {{ topic.last_studied|default:"从未开始" }}
+            </p>
+        </div>
+    {% endfor %}
+    {% endif %}
 {% else %}
     <div style="text-align: center; margin-top: 50px;">
         <p>你还没有添加任何想学的内容。</p>
