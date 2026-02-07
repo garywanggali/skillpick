@@ -1,3 +1,7 @@
+import warnings
+# 忽略 DuckDuckGo 的 RuntimeWarning
+warnings.filterwarnings("ignore", category=RuntimeWarning, module="duckduckgo_search")
+
 import os
 import json
 import logging
