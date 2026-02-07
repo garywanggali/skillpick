@@ -11,6 +11,7 @@ from django import forms
 from django.utils import timezone
 from datetime import date
 from .recommendation import get_ai_video_recommendation
+from django.db import IntegrityError
 
 # Forms
 class TopicForm(forms.ModelForm):
@@ -69,14 +70,18 @@ class DashboardView(LoginRequiredMixin, ListView):
                 # 调用 AI 推荐服务
                 ai_rec = get_ai_video_recommendation(selected_topic)
                 
-                recommendation = DailyRecommendation.objects.create(
-                    user=self.request.user,
-                    topic=selected_topic,
-                    date=today,
-                    recommended_video_title=ai_rec['title'] if ai_rec else None,
-                    recommended_video_url=ai_rec['url'] if ai_rec else None,
-                    recommended_reason=ai_rec['reason'] if ai_rec else None
-                )
+                try:
+                    recommendation = DailyRecommendation.objects.create(
+                        user=self.request.user,
+                        topic=selected_topic,
+                        date=today,
+                        recommended_video_title=ai_rec['title'] if ai_rec else None,
+                        recommended_video_url=ai_rec['url'] if ai_rec else None,
+                        recommended_reason=ai_rec['reason'] if ai_rec else None
+                    )
+                except IntegrityError:
+                    # 如果并发请求导致已存在，则重新获取
+                    recommendation = DailyRecommendation.objects.filter(user=self.request.user, date=today).first()
         
         if recommendation:
             context['daily_topic'] = recommendation.topic
@@ -141,14 +146,19 @@ def daily_pick(request):
         # 调用 AI 推荐服务
         ai_rec = get_ai_video_recommendation(selected_topic)
 
-        recommendation = DailyRecommendation.objects.create(
-            user=request.user,
-            topic=selected_topic,
-            date=today,
-            recommended_video_title=ai_rec['title'] if ai_rec else None,
-            recommended_video_url=ai_rec['url'] if ai_rec else None,
-            recommended_reason=ai_rec['reason'] if ai_rec else None
-        )
+        try:
+            recommendation = DailyRecommendation.objects.create(
+                user=request.user,
+                topic=selected_topic,
+                date=today,
+                recommended_video_title=ai_rec['title'] if ai_rec else None,
+                recommended_video_url=ai_rec['url'] if ai_rec else None,
+                recommended_reason=ai_rec['reason'] if ai_rec else None
+            )
+        except IntegrityError:
+            # 如果并发请求导致已存在，则重新获取
+            recommendation = DailyRecommendation.objects.filter(user=request.user, date=today).first()
+            selected_topic = recommendation.topic
     
     # 准备上下文
     context = {
