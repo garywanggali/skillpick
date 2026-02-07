@@ -188,29 +188,63 @@ from .models import LearningLog, TopicRecommendationCache
 
 # ... (keep imports)
 
-def search_youtube_via_ddg(keywords, limit=3):
+def search_zhihu_candidates(keywords, limit=3):
     """
-    通过 DuckDuckGo 专门搜索 YouTube 视频
+    搜索知乎视频和回答
     """
-    print(f"Searching YouTube (via DDG) for: {keywords}")
+    print(f"Searching Zhihu for: {keywords}")
     candidates = []
     try:
-        # 强制指定 site:youtube.com
-        results = DDGS().videos(keywords=f"site:youtube.com {keywords}", region="wt-wt", safesearch="off", max_results=limit)
+        url = "https://www.zhihu.com/api/v4/search_v3"
+        params = {
+            't': 'general',
+            'q': keywords,
+            'correction': 1,
+            'offset': 0,
+            'limit': limit * 2
+        }
+        # 知乎需要真实的 User-Agent
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.114 Safari/537.36',
+            'Referer': 'https://www.zhihu.com/search?type=content&q=' + keywords
+        }
+        resp = requests.get(url, params=params, headers=headers, timeout=5)
         
-        if results:
-            for r in results:
-                candidates.append({
-                    'title': r.get('title', 'No Title'),
-                    'description': r.get('description', '')[:150],
-                    'duration': r.get('duration', 'N/A'),
-                    'play': r.get('views', 0),
-                    'author': r.get('publisher', 'YouTube'),
-                    'url': r.get('content', '#'),
-                    'provider': 'YouTube'
-                })
+        if resp.status_code == 200:
+            data = resp.json()
+            if 'data' in data:
+                for item in data['data']:
+                    obj = item.get('object', {})
+                    type_ = item.get('type')
+                    
+                    title = ""
+                    desc = ""
+                    url = ""
+                    
+                    if type_ == 'zvideo': # 视频
+                        title = obj.get('title', '')
+                        desc = obj.get('description', '')
+                        url = f"https://www.zhihu.com/zvideo/{obj.get('id')}"
+                    elif type_ == 'search_result' and 'title' in obj: # 通用结果
+                        title = obj.get('title', '').replace('<em>', '').replace('</em>', '')
+                        desc = obj.get('content', '')[:100]
+                        # 构造 URL 比较复杂，简化处理
+                        if 'id' in obj:
+                            url = f"https://www.zhihu.com/question/{obj.get('question', {}).get('id')}/answer/{obj.get('id')}"
+                    
+                    if title and url:
+                        candidates.append({
+                            'title': title,
+                            'description': desc,
+                            'duration': 'N/A',
+                            'play': obj.get('voteup_count', 0), # 用点赞数代替
+                            'author': obj.get('author', {}).get('name', ''),
+                            'url': url,
+                            'provider': 'Zhihu'
+                        })
+                        if len(candidates) >= limit: break
     except Exception as e:
-        print(f"YouTube Search failed: {e}")
+        print(f"Zhihu Search failed: {e}")
         
     return candidates
 
@@ -219,6 +253,7 @@ def get_ai_video_recommendation(topic):
     基于 Topic 和学习记录，智能推荐一个视频。
     优先查询缓存，缓存未命中则调用搜索+LLM，并写入缓存。
     """
+    # ... (cache logic)
     # 1. 尝试从缓存获取
     last_log = LearningLog.objects.filter(topic=topic).order_by('-created_at').first()
     keywords = f"{topic.title} {topic.get_current_level_display()} 教程"
@@ -245,25 +280,29 @@ def get_ai_video_recommendation(topic):
     # 3. 获取候选视频 (多源并行)
     candidates = []
     
-    # Source A: Bilibili API (国内首选)
+    # Source A: Bilibili API
     bili_candidates = search_bilibili_candidates(keywords, limit=5)
     candidates.extend(bili_candidates)
     
-    # Source B: YouTube (通过 DDG, 全球首选)
-    # 只有当 B站结果不够多，或者为了多样性时才搜
-    yt_candidates = search_youtube_via_ddg(keywords, limit=3)
-    candidates.extend(yt_candidates)
-
-    # Source C: General DDG (全网兜底)
+    # Source B: Zhihu (新增国内源)
+    # 当 B站结果少时，补充知乎
     if len(candidates) < 5:
-        ddg_candidates = search_candidates_from_ddg(keywords, limit=5)
+        zhihu_candidates = search_zhihu_candidates(keywords, limit=3)
+        candidates.extend(zhihu_candidates)
+
+    # Source C: General DDG (最后兜底，如果连得上)
+    # 暂时移除 DDG 以避免超时，或者放在最后 try-except
+    if len(candidates) < 3:
+        # 只有当前面都没搜到时才试 DDG
+        ddg_candidates = search_candidates_from_ddg(keywords, limit=3)
         candidates.extend(ddg_candidates)
     
-    # 4. Blind LLM Fallback (如果搜不到视频，让 LLM 直接生成建议)
+    # 4. Blind LLM Fallback
     if not candidates:
         print("No candidates found. Using Blind LLM Fallback.")
         return call_llm_for_blind_suggestion(topic, last_log)
 
+    # ... (rest logic)
     # 5. 使用 LLM 选择最佳视频
     selection = call_llm_to_select(topic, last_log, candidates)
     
